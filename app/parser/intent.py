@@ -7,7 +7,7 @@ INTENT_HELP = "help"
 INTENT_UNKNOWN = "unknown"
 
 
-def parse_intent(text: str) -> tuple[str, dict]:
+def parse(text: str) -> tuple[str, dict]:
     text_lower = text.lower().strip()
 
     compare_match = re.search(r"bandingkan\s+(\w+)\s*(?:dan|,|vs|dengan)?\s*(\w*)", text_lower)
