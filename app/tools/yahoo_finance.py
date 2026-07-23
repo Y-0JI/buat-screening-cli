@@ -1,4 +1,5 @@
 import yfinance as yf
+from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.tools.base import StockProvider
 
@@ -10,6 +11,7 @@ class YahooFinanceProvider(StockProvider):
             info = stock.info
             hist = stock.history(period=period)
             if hist.empty:
+                logger.info(f"Data kosong untuk {ticker}")
                 return None
             stock_info = StockInfo(
                 ticker=ticker.upper(),
@@ -30,7 +32,8 @@ class YahooFinanceProvider(StockProvider):
                 for _, row in hist.iterrows()
             ]
             return StockData(info=stock_info, history=history)
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Gagal fetch {ticker}: {e}")
             return None
 
     def get_price(self, ticker: str) -> float | None:
