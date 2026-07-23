@@ -2,7 +2,7 @@ from app.config.settings import Settings
 
 
 def test_settings_defaults() -> None:
-    s = Settings()
+    s = Settings(_env_file=None)
     assert s.ai_api_key == ""
     assert s.ai_model == ""
     assert s.ai_base_url == ""

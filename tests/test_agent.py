@@ -43,7 +43,9 @@ def test_compare_with_ai():
             assert "BBCA" in result["analysis"]
 
 
-def test_ask_llm_no_api_key():
+@patch("app.agent.core.chat_completion")
+def test_ask_llm_no_api_key(mock_llm):
+    mock_llm.return_value = None
     result = ask_llm("test query")
     assert result is None
 

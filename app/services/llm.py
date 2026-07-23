@@ -24,6 +24,7 @@ def chat_completion(messages: list[dict], model: str | None = None) -> str | Non
     payload = {
         "model": model_name,
         "messages": messages,
+        "stream": False,
     }
 
     try:
