@@ -17,8 +17,9 @@ pip install -e .
 Copy `.env.example` to `.env` and configure:
 
 ```
-OPENROUTER_API_KEY=sk-or-v1-your-key
-OPENROUTER_MODEL=openai/gpt-4o-mini
+AI_API_KEY=your-api-key-here
+AI_MODEL=openai/gpt-4o-mini
+AI_BASE_URL=https://openrouter.ai/api/v1
 LOG_LEVEL=INFO
 ```
 
