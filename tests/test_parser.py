@@ -1,4 +1,4 @@
-from app.parser.intent import parse, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN
+from app.parser.intent import parse, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN, INTENT_GAINERS, INTENT_LOSERS, INTENT_STOCKS
 
 
 class TestParse:
@@ -21,6 +21,18 @@ class TestParse:
         intent, params = parse("Cari saham yang sedang breakout")
         assert intent == INTENT_SCREEN
 
+    def test_gainers(self):
+        intent, params = parse("top gainers")
+        assert intent == INTENT_GAINERS
+
+    def test_losers(self):
+        intent, params = parse("top losers")
+        assert intent == INTENT_LOSERS
+
+    def test_stocks(self):
+        intent, params = parse("daftar saham")
+        assert intent == INTENT_STOCKS
+
     def test_help(self):
         intent, params = parse("help")
         assert intent == INTENT_HELP
@@ -28,8 +40,3 @@ class TestParse:
     def test_unknown(self):
         intent, params = parse("lalala")
         assert intent == INTENT_UNKNOWN
-
-    def test_top_gainers(self):
-        intent, params = parse("top gainers hari ini")
-        assert intent == INTENT_SCREEN
-        assert params["type"] == "top_gainers"

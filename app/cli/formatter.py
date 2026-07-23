@@ -34,6 +34,44 @@ def print_screening_results(results: list[ScreeningResult]) -> None:
     console.print(table)
 
 
+def print_bulk_screening(results: list[dict], title: str = "Hasil Screening") -> None:
+    if not results:
+        console.print("[yellow]Tidak ada sinyal screening ditemukan.[/yellow]")
+        return
+    table = Table(title=title)
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Nama")
+    table.add_column("Sektor")
+    table.add_column("Harga")
+    table.add_column("Sinyal", style="bold")
+    table.add_column("Confidence")
+    for r in results:
+        ts = r["top_signal"]
+        signal_style = "green" if ts.signal == "BUY" else "red" if ts.signal == "SELL" else "yellow"
+        table.add_row(
+            r["ticker"],
+            r.get("name", "")[:25],
+            (r.get("sector") or "")[:15],
+            f"{r.get('price', 0):,.0f}",
+            f"[{signal_style}]{ts.signal}[/{signal_style}]",
+            f"{ts.confidence:.0%}",
+        )
+    console.print(table)
+
+
+def print_gainer_loser_table(results: list[dict], title: str = "Top") -> None:
+    if not results:
+        console.print("[yellow]Tidak ada data.[/yellow]")
+        return
+    table = Table(title=title)
+    table.add_column("#", style="dim")
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Harga")
+    for i, r in enumerate(results, 1):
+        table.add_row(str(i), r["ticker"], f"{r['price']:,.0f}")
+    console.print(table)
+
+
 def print_price_info(data: StockData) -> None:
     if not data.history:
         console.print("[red]Tidak ada data harga.[/red]")
@@ -58,10 +96,8 @@ def print_ai_analysis(result: AIAnalysis) -> None:
     if result.raw_data:
         header.append(f" - {result.raw_data.info.name}", style="white")
     console.print(Panel(header, title="[bold]AI Analysis[/bold]"))
-
     if result.summary:
         console.print(Panel(result.summary, title="[bold]Ringkasan[/bold]", border_style="blue"))
-
     if result.key_metrics:
         table = Table(title="Metrik Kunci")
         table.add_column("Indikator", style="cyan")
@@ -69,14 +105,11 @@ def print_ai_analysis(result: AIAnalysis) -> None:
         for k, v in result.key_metrics.items():
             table.add_row(k, str(v))
         console.print(table)
-
     if result.risks:
         risks_text = "\n".join(f"• {r}" for r in result.risks)
         console.print(Panel(risks_text, title="[bold red]Risiko[/bold red]", border_style="red"))
-
     if result.conclusion:
         console.print(Panel(result.conclusion, title="[bold green]Kesimpulan[/bold green]", border_style="green"))
-
     if result.screening_results:
         print_screening_results(result.screening_results)
 
