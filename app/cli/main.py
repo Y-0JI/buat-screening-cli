@@ -1,8 +1,9 @@
 import typer
 from app.config.settings import settings
 from app.utils.logging import setup_logging
-from app.cli.formatter import print_error, print_info
-from app.agent.parser import parse_intent, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP
+from app.parser.intent import parse
+from app.agent.core import process, ask_llm
+from app.cli.formatter import print_stock_header, print_price_info, print_screening_results, print_error, print_info, console
 
 app = typer.Typer()
 
@@ -14,9 +15,8 @@ def main() -> None:
 
 @app.command()
 def analyze(ticker: str) -> None:
-    from app.tools.yahoo_finance import get_stock_data
-    from app.cli.formatter import print_stock_header, print_price_info
-    data = get_stock_data(ticker)
+    result = process("analyze", {"ticker": ticker})
+    data = result.get("data")
     if not data:
         print_error(f"Data untuk {ticker.upper()} tidak ditemukan")
         raise typer.Exit(1)
@@ -31,64 +31,56 @@ def screen() -> None:
 
 @app.command()
 def compare(tickers: str) -> None:
-    from app.tools.yahoo_finance import get_stock_data
-    from app.cli.formatter import print_stock_header, print_price_info
-    parts = [t.strip().upper() for t in tickers.split(",")]
-    for t in parts:
-        data = get_stock_data(t)
+    result = process("compare", {"tickers": tickers.upper()})
+    for r in result.get("results", []):
+        data = r.get("data")
         if data:
             print_stock_header(data)
             print_price_info(data)
         else:
-            print_error(f"Data untuk {t} tidak ditemukan")
+            print_error(f"Data untuk {r['ticker']} tidak ditemukan")
 
 
 @app.command()
 def natural(query: str) -> None:
-    intent, params = parse_intent(query)
-    if intent == INTENT_ANALYZE:
-        from app.tools.yahoo_finance import get_stock_data
-        from app.cli.formatter import print_stock_header, print_price_info
-        data = get_stock_data(params["ticker"])
-        if not data:
-            print_error(f"Data untuk {params['ticker']} tidak ditemukan")
-            return
-        print_stock_header(data)
-        print_price_info(data)
-    elif intent == INTENT_SCREEN:
-        print_info(f"Screening: {params.get('type', 'all')}")
-    elif intent == INTENT_COMPARE:
-        from app.tools.yahoo_finance import get_stock_data
-        from app.cli.formatter import print_stock_header, print_price_info
-        for t in params["tickers"].split(","):
-            t = t.strip()
-            data = get_stock_data(t)
+    intent, params = parse(query)
+    if intent in ("analyze", "compare", "screen", "help"):
+        result = process(intent, params)
+        intent_type = result.get("type")
+
+        if intent_type == "analyze":
+            data = result.get("data")
             if data:
                 print_stock_header(data)
                 print_price_info(data)
-    elif intent == INTENT_HELP:
-        from app.cli.formatter import console
-        console.print("[bold]Screening CLI[/bold] - AI-powered Indonesian stock screener")
-        console.print("Commands: analyze, screen, compare, natural, info")
+            else:
+                print_error(f"Data untuk {params.get('ticker', '?')} tidak ditemukan")
+        elif intent_type == "compare":
+            for r in result.get("results", []):
+                data = r.get("data")
+                if data:
+                    print_stock_header(data)
+                    print_price_info(data)
+        elif intent_type == "screen":
+            screen()
+        elif intent_type == "help":
+            info()
     else:
-        from app.agent.core import ask_agent
-        resp = ask_agent(query)
+        resp = ask_llm(query)
         if resp:
-            from app.cli.formatter import console
             console.print(resp)
         else:
-            print_error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'help'")
+            print_error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'info'")
 
 
 @app.command()
 def info() -> None:
-    from app.cli.formatter import console
     console.print("[bold]Available commands:[/bold]")
     console.print("  analyze [ticker]     - Analisa saham")
     console.print("  screen               - Screening saham")
     console.print("  compare [t1,t2]      - Bandingkan dua saham")
     console.print('  natural "[query]"    - Bahasa natural')
-    console.print("  info (help)          - Bantuan ini")
+    console.print("  info                 - Bantuan ini")
 
 
 if __name__ == "__main__":

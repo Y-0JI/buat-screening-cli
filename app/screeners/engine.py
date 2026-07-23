@@ -69,6 +69,30 @@ def ema_rules(data: StockData) -> list[ScreeningResult]:
     return results
 
 
+def breakout(data: StockData, lookback: int = 20) -> ScreeningResult | None:
+    hist = data.history
+    if len(hist) < lookback + 1:
+        return None
+    resistance = max(p.high for p in hist[-lookback - 1 : -1])
+    if hist[-1].close > resistance:
+        return ScreeningResult(ticker=data.info.ticker, signal="BUY", reason=f"Breakout above {resistance:.0f}", confidence=0.7)
+    return None
+
+
+def trend_detection(data: StockData, period: int = 50) -> ScreeningResult | None:
+    sma_vals = sma(data.history, period)
+    valid = [v for v in sma_vals if v is not None]
+    if len(valid) < 10:
+        return None
+    recent = valid[-5:]
+    avg_change = (recent[-1] - recent[0]) / len(recent)
+    if avg_change > recent[0] * 0.005:
+        return ScreeningResult(ticker=data.info.ticker, signal="BUY", reason=f"Uptrend detected (SMA{period} rising)", confidence=0.5)
+    if avg_change < -recent[0] * 0.005:
+        return ScreeningResult(ticker=data.info.ticker, signal="SELL", reason=f"Downtrend detected (SMA{period} falling)", confidence=0.5)
+    return ScreeningResult(ticker=data.info.ticker, signal="HOLD", reason=f"Sideways trend (SMA{period} flat)", confidence=0.3)
+
+
 def screen_stock(data: StockData) -> list[ScreeningResult]:
     results: list[ScreeningResult] = []
     gc = golden_cross(data)
@@ -81,4 +105,10 @@ def screen_stock(data: StockData) -> list[ScreeningResult]:
     if vs:
         results.append(vs)
     results.extend(ema_rules(data))
+    bo = breakout(data)
+    if bo:
+        results.append(bo)
+    td = trend_detection(data)
+    if td:
+        results.append(td)
     return results

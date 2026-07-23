@@ -1,7 +1,7 @@
 from datetime import date
 import pytest
 from app.models.stock import HistoricalPrice, StockData, StockInfo
-from app.screeners.engine import rsi_signal, volume_spike, screen_stock
+from app.screeners.engine import rsi_signal, volume_spike, screen_stock, breakout, trend_detection
 
 
 def _make_data(closes: list[float], volumes: list[int] | None = None) -> StockData:
@@ -59,9 +59,33 @@ class TestVolumeSpike:
         assert result is None
 
 
+class TestBreakout:
+    def test_breakout_detected(self):
+        hist = [100.0] * 22 + [110.0]
+        data = _make_data(hist)
+        result = breakout(data)
+        assert result is not None
+        assert result.signal == "BUY"
+        assert "Breakout" in result.reason
+
+    def test_no_breakout(self):
+        closes = [100.0] * 25
+        data = _make_data(closes)
+        result = breakout(data)
+        assert result is None
+
+
+class TestTrendDetection:
+    def test_screen_returns_list(self):
+        closes = [100.0] * 60
+        data = _make_data(closes)
+        result = trend_detection(data)
+        assert result is not None
+
+
 class TestScreenStock:
     def test_screen_returns_list(self):
-        closes = [100.0] * 30
+        closes = [100.0] * 60
         data = _make_data(closes)
         results = screen_stock(data)
         assert isinstance(results, list)

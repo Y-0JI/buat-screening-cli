@@ -12,3 +12,13 @@
 -   Every feature must include tests.
 -   Update documentation with each feature.
 -   Keep architecture provider agnostic.
+
+## Architecture Authority
+
+The project documentation is the single source of truth.
+
+Do not simplify, redesign, or remove architectural components because they appear unnecessary for the current MVP.
+
+If an implementation conflicts with the documented architecture, follow the documentation unless explicitly instructed otherwise.
+
+If you believe the documentation should change, propose the change first instead of implementing it directly.
