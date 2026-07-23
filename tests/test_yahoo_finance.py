@@ -2,7 +2,12 @@ from unittest.mock import patch, MagicMock
 from datetime import date
 import pandas as pd
 import pytest
-from app.tools.yahoo_finance import get_stock_data, get_current_price
+from app.tools.yahoo_finance import YahooFinanceProvider
+
+
+@pytest.fixture
+def provider():
+    return YahooFinanceProvider()
 
 
 @pytest.fixture
@@ -25,9 +30,9 @@ def mock_stock_data():
     return mock_ticker
 
 
-def test_get_stock_data_success(mock_stock_data):
+def test_fetch_success(provider, mock_stock_data):
     with patch("app.tools.yahoo_finance.yf.Ticker", return_value=mock_stock_data):
-        result = get_stock_data("BBCA")
+        result = provider.fetch("BBCA")
 
     assert result is not None
     assert result.info.ticker == "BBCA"
@@ -37,30 +42,30 @@ def test_get_stock_data_success(mock_stock_data):
     assert result.history[0].close == 1005.0
 
 
-def test_get_stock_data_empty_history():
+def test_fetch_empty_history(provider):
     mock_ticker = MagicMock()
     mock_ticker.info = {"longName": "Test"}
     mock_ticker.history.return_value = pd.DataFrame()
 
     with patch("app.tools.yahoo_finance.yf.Ticker", return_value=mock_ticker):
-        result = get_stock_data("TEST")
+        result = provider.fetch("TEST")
 
     assert result is None
 
 
-def test_get_current_price(mock_stock_data):
+def test_get_price(provider, mock_stock_data):
     with patch("app.tools.yahoo_finance.yf.Ticker", return_value=mock_stock_data):
-        price = get_current_price("BBCA")
+        price = provider.get_price("BBCA")
 
     assert price == 1005.0
 
 
-def test_get_current_price_empty():
+def test_get_price_empty(provider):
     mock_ticker = MagicMock()
     mock_ticker.info = {}
     mock_ticker.history.return_value = pd.DataFrame()
 
     with patch("app.tools.yahoo_finance.yf.Ticker", return_value=mock_ticker):
-        price = get_current_price("TEST")
+        price = provider.get_price("TEST")
 
     assert price is None

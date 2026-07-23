@@ -1,10 +1,12 @@
+from unittest.mock import patch
 from typer.testing import CliRunner
 from app.cli.main import app
 
 runner = CliRunner()
 
 
-def test_cli_analyze_flow():
+@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+def test_cli_analyze_flow(mock_stocks):
     result = runner.invoke(app, ["analyze", "BBCA"])
     assert result.exit_code in (0, 1)
 
@@ -26,6 +28,23 @@ def test_cli_score_flow():
 
 def test_cli_help_flow():
     result = runner.invoke(app, ["info"])
+    assert result.exit_code == 0
+
+
+@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+def test_cli_screen_flow(mock_stocks):
+    result = runner.invoke(app, ["screen", "--limit", "3"])
+    assert result.exit_code == 0
+
+
+@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+def test_cli_gainers_flow(mock_stocks):
+    result = runner.invoke(app, ["gainers"])
+    assert result.exit_code == 0
+
+
+def test_cli_stocks_flow():
+    result = runner.invoke(app, ["stocks"])
     assert result.exit_code == 0
 
 

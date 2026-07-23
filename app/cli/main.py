@@ -1,12 +1,13 @@
 import typer
-from typing import Optional
 from app.config.settings import settings
 from app.utils.logging import setup_logging
-from app.parser.intent import parse
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.cli.formatter import print_ai_analysis, print_error, print_info, console
-from app.router.engine import fetch_stock, build_context, run_screening
-from app.cli.formatter import print_stock_header, print_screening_results
+from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers
+from app.cli.formatter import print_stock_header, print_screening_results, print_bulk_screening, print_gainer_loser_table
+from app.parser.intent import parse
+from app.services.stock_list import get_all, search
+from typing import Optional
 
 app = typer.Typer()
 
@@ -63,13 +64,43 @@ def compare(
 
 
 @app.command()
-def screen() -> None:
-    print_info("Fitur screen penuh akan menggunakan data dari daftar saham IDX")
+def screen(
+    sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
+    limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
+) -> None:
+    tickers = [s["ticker"] for s in get_all()]
+    with console.status(f"[bold blue]Screening {len(tickers)} saham..."):
+        results = bulk_screen(tickers)
+    if sector:
+        results = [r for r in results if r.get("sector") and sector.lower() in r["sector"].lower()]
+    if limit:
+        results = results[:limit]
+    if not results:
+        print_info("Tidak ada sinyal screening ditemukan")
+        return
+    print_bulk_screening(results, title=f"Hasil Screening{' — ' + sector if sector else ''}")
+
+
+@app.command()
+def gainers(limit: int = 10) -> None:
+    tickers = [s["ticker"] for s in get_all()]
+    with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
+        results = bulk_gainers(tickers)
+    print_gainer_loser_table(results[:limit], title="Top Gainers")
+
+
+@app.command()
+def stocks(query: Optional[str] = typer.Argument(None, help="Cari kode/nama saham")) -> None:
+    all_stocks = search(query) if query else get_all()
+    console.print(f"[bold]Total: {len(all_stocks)} saham[/bold]")
+    for s in all_stocks[:30]:
+        console.print(f"  [cyan]{s['ticker']}[/cyan] - {s['name']}")
+    if len(all_stocks) > 30:
+        console.print(f"  ... dan {len(all_stocks) - 30} lainnya (gunakan filter untuk spesifik)")
 
 
 @app.command()
 def natural(query: str) -> None:
-    from app.parser.intent import parse
     intent, params = parse(query)
     if intent == "analyze":
         analyze(params.get("ticker", ""))
@@ -95,6 +126,9 @@ def info() -> None:
     console.print("  trend [ticker]       - Trend teknikal saham")
     console.print("  score [ticker]       - Screening score saham")
     console.print("  compare [t1] [t2]    - Bandingkan dua saham")
+    console.print("  screen [opts]        - Bulk screening (--sector, --limit)")
+    console.print("  gainers              - Top gainers")
+    console.print("  stocks [query]       - Daftar saham")
     console.print('  natural "[query]"    - Bahasa natural')
     console.print("  info                 - Bantuan ini")
 
