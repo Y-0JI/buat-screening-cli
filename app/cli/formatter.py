@@ -3,6 +3,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 from app.models.stock import StockData
+from app.models.analysis import AIAnalysis
 from app.screeners.engine import ScreeningResult
 
 console = Console()
@@ -24,13 +25,12 @@ def print_screening_results(results: list[ScreeningResult]) -> None:
         console.print("[yellow]Tidak ada sinyal screening ditemukan.[/yellow]")
         return
     table = Table(title="Hasil Screening")
-    table.add_column("Ticker", style="cyan")
     table.add_column("Sinyal", style="bold")
     table.add_column("Alasan")
     table.add_column("Confidence")
     for r in results:
         signal_style = "green" if r.signal == "BUY" else "red" if r.signal == "SELL" else "yellow"
-        table.add_row(r.ticker, f"[{signal_style}]{r.signal}[/{signal_style}]", r.reason, f"{r.confidence:.0%}")
+        table.add_row(f"[{signal_style}]{r.signal}[/{signal_style}]", r.reason, f"{r.confidence:.0%}")
     console.print(table)
 
 
@@ -50,6 +50,35 @@ def print_price_info(data: StockData) -> None:
         f"Perubahan: [{change_style}]{change:+,.0f} ({pct:+.2f}%)[/{change_style}]",
         title="[bold]Price[/bold]"
     ))
+
+
+def print_ai_analysis(result: AIAnalysis) -> None:
+    header = Text()
+    header.append(f"{result.ticker}", style="bold cyan")
+    if result.raw_data:
+        header.append(f" - {result.raw_data.info.name}", style="white")
+    console.print(Panel(header, title="[bold]AI Analysis[/bold]"))
+
+    if result.summary:
+        console.print(Panel(result.summary, title="[bold]Ringkasan[/bold]", border_style="blue"))
+
+    if result.key_metrics:
+        table = Table(title="Metrik Kunci")
+        table.add_column("Indikator", style="cyan")
+        table.add_column("Nilai", style="white")
+        for k, v in result.key_metrics.items():
+            table.add_row(k, str(v))
+        console.print(table)
+
+    if result.risks:
+        risks_text = "\n".join(f"• {r}" for r in result.risks)
+        console.print(Panel(risks_text, title="[bold red]Risiko[/bold red]", border_style="red"))
+
+    if result.conclusion:
+        console.print(Panel(result.conclusion, title="[bold green]Kesimpulan[/bold green]", border_style="green"))
+
+    if result.screening_results:
+        print_screening_results(result.screening_results)
 
 
 def print_error(message: str) -> None:
