@@ -51,3 +51,15 @@ def test_gainers_command(mock_stocks):
 def test_stocks_command():
     result = runner.invoke(app, ["stocks"])
     assert result.exit_code == 0
+
+
+@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}, {"ticker": "BBRI"}])
+def test_losers_command(mock_stocks):
+    result = runner.invoke(app, ["losers"])
+    assert result.exit_code == 0
+
+
+@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}, {"ticker": "BBRI"}])
+def test_sector_command(mock_stocks):
+    result = runner.invoke(app, ["sector", "Financials"])
+    assert result.exit_code == 0

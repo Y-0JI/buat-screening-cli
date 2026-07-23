@@ -53,6 +53,15 @@ def bulk_gainers(tickers: list[str]) -> list[dict]:
     return sorted(results, key=lambda r: r["price"], reverse=True)[:10]
 
 
+def bulk_losers(tickers: list[str]) -> list[dict]:
+    results = []
+    for t in tickers:
+        price = provider.get_price(t)
+        if price is not None:
+            results.append({"ticker": t, "price": price})
+    return sorted(results, key=lambda r: r["price"])[:10]
+
+
 def _calc_change(data: StockData) -> str:
     if len(data.history) < 2:
         return "0%"
