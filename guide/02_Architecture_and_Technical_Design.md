@@ -99,20 +99,24 @@ Terminal
 super-screening-ai/
 
 app/
-    cli/
-    agent/          # intent, tool selection, summarization (termasuk yang dulu direncanakan masuk folder ai/ terpisah)
-    tools/
-    indicators/
-    screeners/
-    services/
-    config/
-    models/         # pydantic models
-    prompts/        # prompt templates
-    utils/
+    cli/            # CLI entrypoint & formatter
+    agent/          # intent, tool selection, summarization
+    parser/         # intent parsing layer
+    router/         # tool orchestration layer
+    tools/          # data provider abstraction
+    indicators/     # technical indicator calculations
+    screeners/      # screening rules engine
+    services/       # external services (OpenRouter, stock list)
+    config/         # settings (.env)
+    models/         # pydantic models (stock, analysis)
+    prompts/        # AI prompt templates
+    data/           # static data (stock universe)
+    utils/          # logging, helpers
 
-tests/
-logs/
+tests/              # unit + integration tests
+logs/               # runtime logs
 docs/
+guide/              # project documentation
 
 .env
 README.md

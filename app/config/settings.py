@@ -2,8 +2,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    openrouter_api_key: str = ""
-    openrouter_model: str = "openai/gpt-4o-mini"
+    ai_api_key: str = ""
+    ai_model: str = ""
+    ai_base_url: str = ""
     log_level: str = "INFO"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

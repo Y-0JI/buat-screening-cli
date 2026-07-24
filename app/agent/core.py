@@ -1,6 +1,6 @@
 from app.router.engine import fetch_stock, build_context
 from app.models.analysis import AIAnalysis
-from app.services.openrouter import chat_completion
+from app.services.llm import chat_completion
 
 
 def _load_prompt(name: str) -> str:
