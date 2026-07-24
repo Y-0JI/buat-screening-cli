@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.tools.yahoo_finance import provider
 from app.screeners.engine import screen_stock
 from app.indicators.engine import sma, rsi, macd, bollinger
@@ -25,41 +26,63 @@ def build_context(data: StockData) -> dict:
     }
 
 
+def _fetch_and_screen(t: str) -> dict | None:
+    data = provider.fetch(t, period="3mo")
+    if not data:
+        return None
+    signals = screen_stock(data)
+    if not signals:
+        return None
+    return {
+        "ticker": t,
+        "name": data.info.name,
+        "sector": data.info.sector,
+        "price": data.history[-1].close,
+        "signals": signals,
+        "max_confidence": max(s.confidence for s in signals),
+        "top_signal": max(signals, key=lambda s: s.confidence),
+    }
+
+
 def bulk_screen(tickers: list[str]) -> list[dict]:
     results = []
-    for t in tickers:
-        data = provider.fetch(t, period="3mo")
-        if data:
-            signals = screen_stock(data)
-            if signals:
-                results.append({
-                    "ticker": t,
-                    "name": data.info.name,
-                    "sector": data.info.sector,
-                    "price": data.history[-1].close,
-                    "signals": signals,
-                    "max_confidence": max(s.confidence for s in signals),
-                    "top_signal": max(signals, key=lambda s: s.confidence),
-                })
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        for r in ex.map(_fetch_and_screen, tickers):
+            if r:
+                results.append(r)
     return sorted(results, key=lambda r: r["max_confidence"], reverse=True)
 
 
 def bulk_gainers(tickers: list[str]) -> list[dict]:
     results = []
-    for t in tickers:
-        price = provider.get_price(t)
-        if price is not None:
-            results.append({"ticker": t, "price": price})
-    return sorted(results, key=lambda r: r["price"], reverse=True)[:10]
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        for f in as_completed(futures):
+            t = futures[f]
+            data = f.result()
+            if data and len(data.history) >= 2:
+                prices = data.history
+                price = prices[-1].close
+                prev = prices[-2].close
+                change = ((price - prev) / prev) * 100 if prev else 0.0
+                results.append({"ticker": t, "price": price, "change": round(change, 2)})
+    return sorted(results, key=lambda r: r["change"], reverse=True)[:10]
 
 
 def bulk_losers(tickers: list[str]) -> list[dict]:
     results = []
-    for t in tickers:
-        price = provider.get_price(t)
-        if price is not None:
-            results.append({"ticker": t, "price": price})
-    return sorted(results, key=lambda r: r["price"])[:10]
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        for f in as_completed(futures):
+            t = futures[f]
+            data = f.result()
+            if data and len(data.history) >= 2:
+                prices = data.history
+                price = prices[-1].close
+                prev = prices[-2].close
+                change = ((price - prev) / prev) * 100 if prev else 0.0
+                results.append({"ticker": t, "price": price, "change": round(change, 2)})
+    return sorted(results, key=lambda r: r["change"])[:10]
 
 
 def _calc_change(data: StockData) -> str:
