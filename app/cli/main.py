@@ -1,3 +1,4 @@
+import sys
 import typer
 from app.config.settings import settings
 from app.utils.logging import setup_logging
@@ -5,9 +6,19 @@ from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.cli.formatter import print_ai_analysis, print_error, print_info, console
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
 from app.cli.formatter import print_stock_header, print_screening_results, print_bulk_screening, print_gainer_loser_table
-from app.parser.intent import parse
+from app.parser.intent import INTENT_UNKNOWN, parse
 from app.services.stock_list import get_all, search
 from typing import Optional
+
+_KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
+                   "losers", "sector", "stocks", "natural", "info"}
+
+def _reroute_unknown_to_natural():
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    if args and args[0].lower() not in _KNOWN_COMMANDS:
+        sys.argv.insert(1, "natural")
+
+_reroute_unknown_to_natural()
 
 app = typer.Typer()
 
@@ -152,7 +163,7 @@ def info() -> None:
     console.print("  losers               - Top losers")
     console.print('  sector [name]        - Screening by sector, contoh: "sector Financials"')
     console.print("  stocks [query]       - Daftar saham")
-    console.print('  natural "[query]"    - Bahasa natural')
+    console.print('  "[query]"            - Bahasa natural (contoh: "BBCA" atau "analisa BBCA")')
     console.print("  info                 - Bantuan ini")
 
 

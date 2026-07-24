@@ -100,7 +100,7 @@ def print_ai_analysis(result: AIAnalysis) -> None:
         header.append(f" - {result.raw_data.info.name}", style="white")
     console.print(Panel(header, title="[bold]AI Analysis[/bold]"))
     if result.summary:
-        console.print(Panel(result.summary, title="[bold]Ringkasan[/bold]", border_style="blue"))
+        console.print(result.summary)
     if result.key_metrics:
         table = Table(title="Metrik Kunci")
         table.add_column("Indikator", style="cyan")
