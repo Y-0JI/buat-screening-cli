@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from app.models.stock import StockData
-from app.indicators.engine import sma, ema, rsi, bollinger
+from app.indicators.engine import sma, ema, rsi
 
 
 @dataclass

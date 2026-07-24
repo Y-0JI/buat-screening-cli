@@ -6,14 +6,6 @@ def _closes(prices: list[HistoricalPrice]) -> list[float]:
     return [p.close for p in prices]
 
 
-def _highs(prices: list[HistoricalPrice]) -> list[float]:
-    return [p.high for p in prices]
-
-
-def _lows(prices: list[HistoricalPrice]) -> list[float]:
-    return [p.low for p in prices]
-
-
 def sma(prices: list[HistoricalPrice], period: int = 20) -> list[float | None]:
     c = _closes(prices)
     result: list[float | None] = []
