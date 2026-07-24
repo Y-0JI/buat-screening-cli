@@ -103,18 +103,21 @@ def ask_llm(user_query: str, context: str = "") -> str | None:
     if not resp:
         return None
 
-    tool_match = re.search(r'\[TOOL:\s*(\w+)\s*(.*?)\]', resp, re.DOTALL)
-    if not tool_match:
+    tool_matches = re.findall(r'\[TOOL:\s*(\w+)\s*(.*?)\]', resp, re.DOTALL)
+    if not tool_matches:
         return resp
 
-    tool_name = tool_match.group(1).lower()
-    tool_args = tool_match.group(2).strip().split()
-    tool_result = _run_tool(tool_name, tool_args)
-    if tool_result is None:
-        return resp
+    results = []
+    for tool_name, tool_args_str in tool_matches:
+        tool_name = tool_name.lower()
+        tool_args = tool_args_str.strip().split()
+        result = _run_tool(tool_name, tool_args)
+        if result is None:
+            result = f"Tool '{tool_name}' tidak dikenali atau gagal."
+        results.append(f"[{tool_name}] {result}")
 
     messages.append({"role": "assistant", "content": resp})
-    messages.append({"role": "user", "content": f"Tool result:\n{tool_result}\n\nJelaskan hasil ini ke pengguna dengan bahasa natural."})
+    messages.append({"role": "user", "content": f"Hasil eksekusi tool:\n\n" + "\n\n".join(results) + "\n\nJelaskan hasil ini ke pengguna dengan bahasa natural. Jika ada tool yang gagal, sampaikan keterbatasannya."})
     return chat_completion(messages) or resp
 
 
