@@ -1,6 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from app.tools.yahoo_finance import provider
+from app.tools import get_provider
 from app.screeners.engine import screen_stock
+
+provider = get_provider()
 from app.indicators.engine import sma, rsi, macd, bollinger
 from app.models.stock import StockData
 from app.screeners.engine import ScreeningResult
