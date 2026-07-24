@@ -15,3 +15,14 @@ def test_settings_env_override(monkeypatch) -> None:
     s = Settings()
     assert s.ai_api_key == "test-key"
     assert s.log_level == "DEBUG"
+
+
+def test_data_provider_default() -> None:
+    s = Settings(_env_file=None)
+    assert s.data_provider == "yahoo"
+
+
+def test_data_provider_env_override(monkeypatch) -> None:
+    monkeypatch.setenv("DATA_PROVIDER", "idx")
+    s = Settings()
+    assert s.data_provider == "idx"
