@@ -44,10 +44,10 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
 
     return AIAnalysis(
         ticker=ticker.upper(),
-        summary="Analisis AI tidak tersedia (periksa konfigurasi API key)",
+        summary="Analisis AI tidak tersedia (periksa konfigurasi AI di .env)",
         key_metrics={"indikator": ctx["indicators"]},
         risks=[],
-        conclusion="Aktifkan OpenRouter API key untuk analisis AI.",
+        conclusion="Aktifkan AI API key di file .env untuk analisis AI.",
         raw_data=data,
         screening_results=None,
     )
@@ -79,7 +79,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
     return {
         "type": "comparison",
         "tickers": tickers,
-        "analysis": llm_result or "Analisis AI tidak tersedia",
+        "analysis": llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)",
         "data": {r["ticker"]: {"price": r["price"], "change": r["change"], "indicators": r["indicators"]} for r in results},
     }
 
