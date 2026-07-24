@@ -35,10 +35,8 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     if llm_result:
         return AIAnalysis(
             ticker=ticker.upper(),
-            summary=_extract_section(llm_result, "Ringkasan"),
+            summary=llm_result,
             key_metrics=_extract_metrics(ctx["indicators"]),
-            risks=_extract_list(llm_result, "Risiko"),
-            conclusion=_extract_section(llm_result, "Kesimpulan"),
             raw_data=data,
         )
 
@@ -102,17 +100,6 @@ def ask_llm(user_query: str, context: str = "") -> str | None:
     return chat_completion(messages)
 
 
-def _extract_section(text: str, section: str) -> str:
-    pattern = f"**{section}**"
-    if pattern not in text:
-        return text
-    after = text.split(pattern, 1)[1].strip()
-    for s in ["Ringkasan", "Metrik", "Risiko", "Kesimpulan"]:
-        if s != section and f"**{s}**" in after:
-            return after.split(f"**{s}**")[0].strip()
-    return after
-
-
 def _extract_metrics(indicators_str: str) -> dict[str, str | float]:
     metrics: dict[str, str | float] = {}
     for part in indicators_str.split("|"):
@@ -121,22 +108,3 @@ def _extract_metrics(indicators_str: str) -> dict[str, str | float]:
             k, v = part.split("=", 1)
             metrics[k.strip()] = v.strip()
     return metrics
-
-
-def _extract_list(text: str, section: str) -> list[str]:
-    pattern = f"**{section}**"
-    if pattern not in text:
-        return []
-    after = text.split(pattern, 1)[1].strip()
-    next_section = None
-    for s in ["Ringkasan", "Metrik", "Risiko", "Kesimpulan"]:
-        if s != section and f"**{s}**" in after:
-            next_section = after.split(f"**{s}**")[0]
-            break
-    content = (next_section or after)
-    items = []
-    for line in content.split("\n"):
-        stripped = line.strip()
-        if stripped.startswith("-") or stripped.startswith("*"):
-            items.append(stripped.lstrip("-* ").strip())
-    return items

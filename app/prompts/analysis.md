@@ -9,13 +9,10 @@ DATA:
 - Indikator: {{indicators}}
 - Screening: {{screening}}
 
-Aturan:
-- Hanya gunakan data di atas, jangan invent data
-- Jangan hitung indikator sendiri
-- Jika data tidak lengkap, sebutkan keterbatasannya
+Jelaskan kondisi saham ini secara natural. Cakup:
+- Ringkasan kondisi saat ini
+- Poin penting dari indikator teknikal
+- Hal yang perlu diwaspadai
+- Kesimpulan dan pandangan singkat
 
-Output:
-1. **Ringkasan** — 2-3 kalimat kondisi saham saat ini
-2. **Metrik Kunci** — poin-poin penting dari indikator (RSI, MACD, SMA, dll)
-3. **Risiko** — hal-hal yang perlu diwaspadai
-4. **Kesimpulan** — rekomendasi singkat (layak dibeli/tidak/watch)
+Gunakan bahasa yang enak dibaca. Jangan hanya mengulang angka-angka dari data — jelaskan apa artinya. Tapi jangan pernah menambah informasi di luar data yang diberikan.

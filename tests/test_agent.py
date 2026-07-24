@@ -25,11 +25,10 @@ def test_analyze_with_ai_with_llm():
         mock_data = _mock_stock_data()
         mock_fetch.return_value = mock_data
         with patch("app.agent.core.chat_completion") as mock_llm:
-            mock_llm.return_value = "**Ringkasan** Bagus\n**Risiko** - Risiko1\n**Kesimpulan** Beli"
+            mock_llm.return_value = "BBCA menunjukkan tren positif dengan RSI di 65. Risiko utama adalah tekanan jual asing. Kesimpulan: hold."
             result = analyze_with_ai("BBCA")
-            assert result.summary == "Bagus"
-            assert len(result.risks) == 1
-            assert result.conclusion == "Beli"
+            assert "tren positif" in result.summary
+            assert "hold" in result.summary.lower()
 
 
 def test_compare_with_ai():

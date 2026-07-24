@@ -67,7 +67,6 @@ def test_print_ai_analysis_snapshot():
         conclusion="Layak dibeli",
     )
     output = _capture(print_ai_analysis, result)
-    assert "Ringkasan" in output
     assert "Performa saham baik" in output
     assert "Risiko" in output
     assert "Layak dibeli" in output
