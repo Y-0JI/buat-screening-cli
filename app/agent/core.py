@@ -131,13 +131,14 @@ def _run_tool(name: str, args: list[str]) -> str | None:
             return f"Data untuk {ticker} tidak ditemukan."
         ctx = build_context(data)
         return (
+            f"[Data]\n"
             f"Ticker: {ctx['ticker']}\n"
             f"Nama: {ctx['name']}\n"
             f"Sektor: {ctx['sector']}\n"
             f"Harga: {ctx['price']}\n"
-            f"Perubahan: {ctx['change']}\n"
-            f"Indikator: {ctx['indicators']}\n"
-            f"Screening: {ctx['screening']}"
+            f"Perubahan: {ctx['change']}\n\n"
+            f"[Indikator]\n{ctx['indicators']}\n\n"
+            f"[Screening]\n{ctx['screening']}"
         )
 
     if name == "compare":
@@ -151,8 +152,13 @@ def _run_tool(name: str, args: list[str]) -> str | None:
                 parts.append(f"{t}: Data tidak ditemukan.")
             else:
                 ctx = build_context(data)
-                parts.append(f"- {ctx['ticker']}: Harga {ctx['price']}, Perubahan {ctx['change']}, Indikator {ctx['indicators']}, Screening {ctx['screening']}")
-        return "\n".join(parts)
+                parts.append(
+                    f"[Data {ctx['ticker']}]\n"
+                    f"Harga: {ctx['price']}, Perubahan: {ctx['change']}\n"
+                    f"[Indikator {ctx['ticker']}]\n{ctx['indicators']}\n"
+                    f"[Screening {ctx['ticker']}]\n{ctx['screening']}"
+                )
+        return "\n\n".join(parts)
 
     if name == "screen":
         from app.services.stock_list import get_all
