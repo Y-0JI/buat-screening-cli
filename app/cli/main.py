@@ -8,10 +8,12 @@ from app.router.engine import fetch_stock, build_context, run_screening, bulk_sc
 from app.cli.formatter import print_stock_header, print_screening_results, print_bulk_screening, print_gainer_loser_table
 from app.parser.intent import INTENT_UNKNOWN, parse
 from app.services.stock_list import get_all, search
+from app.services.llm import chat_completion
+from app.agent.core import _load_prompt
 from typing import Optional
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
-                   "losers", "sector", "stocks", "natural", "info"}
+                   "losers", "sector", "stocks", "natural", "info", "chat"}
 
 def _reroute_unknown_to_natural():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
@@ -152,6 +154,28 @@ def natural(query: str) -> None:
 
 
 @app.command()
+def chat() -> None:
+    system_prompt = _load_prompt("system.md")
+    messages = [{"role": "system", "content": system_prompt}]
+    console.print("[bold]Mode diskusi. Ketik 'exit' atau Ctrl-C untuk keluar.[/bold]")
+    while True:
+        try:
+            query = console.input("[bold cyan]>> [/bold cyan]")
+            if query.lower() in ("exit", "quit", "keluar"):
+                break
+            messages.append({"role": "user", "content": query})
+            resp = chat_completion(messages)
+            if resp:
+                console.print(resp)
+                messages.append({"role": "assistant", "content": resp})
+            else:
+                print_error("AI tidak merespon. Periksa konfigurasi .env")
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+
+
+@app.command()
 def info() -> None:
     console.print("[bold]Available commands:[/bold]")
     console.print("  analyze [ticker]     - Analisa saham (AI)")
@@ -163,6 +187,7 @@ def info() -> None:
     console.print("  losers               - Top losers")
     console.print('  sector [name]        - Screening by sector, contoh: "sector Financials"')
     console.print("  stocks [query]       - Daftar saham")
+    console.print("  chat                 - Mode diskusi interaktif")
     console.print('  "[query]"            - Bahasa natural (contoh: "BBCA" atau "analisa BBCA")')
     console.print("  info                 - Bantuan ini")
 
