@@ -1,6 +1,6 @@
 from app.tools.yahoo_finance import provider
 from app.screeners.engine import screen_stock
-from app.indicators.engine import sma, ema, rsi, macd, bollinger
+from app.indicators.engine import sma, rsi, macd, bollinger
 from app.models.stock import StockData
 from app.screeners.engine import ScreeningResult
 

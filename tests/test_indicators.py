@@ -30,6 +30,10 @@ class TestSMA:
         assert result[3] == sum([20, 30, 40]) / 3
         assert result[4] == sum([30, 40, 50]) / 3
 
+    def test_sma_period_1(self):
+        result = sma(_make_prices([10, 20, 30]), period=1)
+        assert result == [10.0, 20.0, 30.0]
+
 
 class TestEMA:
     def test_ema_known(self):
@@ -48,8 +52,7 @@ class TestRSI:
     def test_rsi_known(self):
         closes = [44.0, 44.34, 44.09, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00]
         result = rsi(_make_prices(closes), period=14)
-        assert result[14] is not None
-        assert 40 <= result[14] <= 80
+        assert result[14] == pytest.approx(72.983871, abs=0.001)
 
 
 class TestMACD:
@@ -96,6 +99,13 @@ class TestBollinger:
         assert last["middle"] == pytest.approx(50.0)
         assert last["upper"] == pytest.approx(50.0)
         assert last["lower"] == pytest.approx(50.0)
+
+    def test_bollinger_bands_ordered(self):
+        closes = [float(i) for i in range(50, 80)]
+        result = bollinger(_make_prices(closes), period=5)
+        valid = [r for r in result if r is not None]
+        assert len(valid) >= 1
+        assert all(v["upper"] > v["middle"] > v["lower"] for v in valid)
 
 
 class TestADX:

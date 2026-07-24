@@ -55,14 +55,17 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
 
 def compare_with_ai(tickers: list[str]) -> dict:
     results = []
+    failed = []
     for t in tickers:
         data = fetch_stock(t)
         if data:
             ctx = build_context(data)
             results.append(ctx)
+        else:
+            failed.append(t)
 
     if not results:
-        return {"type": "error", "message": "Data tidak ditemukan"}
+        return {"type": "error", "message": f"Data tidak ditemukan: {', '.join(failed)}"}
 
     prompt_template = _load_prompt("comparison.md")
     stocks_text = "\n".join(
@@ -76,10 +79,14 @@ def compare_with_ai(tickers: list[str]) -> dict:
         {"role": "user", "content": filled},
     ])
 
+    analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
+    if failed:
+        analysis += f"\n\n⚠ Tidak dapat memuat data: {', '.join(failed)}"
+
     return {
         "type": "comparison",
         "tickers": tickers,
-        "analysis": llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)",
+        "analysis": analysis,
         "data": {r["ticker"]: {"price": r["price"], "change": r["change"], "indicators": r["indicators"]} for r in results},
     }
 

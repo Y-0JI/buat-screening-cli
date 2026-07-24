@@ -6,14 +6,6 @@ def _closes(prices: list[HistoricalPrice]) -> list[float]:
     return [p.close for p in prices]
 
 
-def _highs(prices: list[HistoricalPrice]) -> list[float]:
-    return [p.high for p in prices]
-
-
-def _lows(prices: list[HistoricalPrice]) -> list[float]:
-    return [p.low for p in prices]
-
-
 def sma(prices: list[HistoricalPrice], period: int = 20) -> list[float | None]:
     c = _closes(prices)
     result: list[float | None] = []
@@ -61,11 +53,13 @@ def rsi(prices: list[HistoricalPrice], period: int = 14) -> list[float | None]:
             elif i == period:
                 avg_g = sum(gains[1 : period + 1]) / period
                 avg_l = sum(losses[1 : period + 1]) / period
+                gains[i] = avg_g
+                losses[i] = avg_l
                 rs = avg_g / avg_l if avg_l != 0 else (1.0 if avg_g == 0 else 100.0)
                 result.append(100.0 - (100.0 / (1.0 + rs)))
             else:
-                avg_g = ((period - 1) * gains[i] + g) / period
-                avg_l = ((period - 1) * losses[i] + l) / period
+                avg_g = ((period - 1) * gains[i - 1] + g) / period
+                avg_l = ((period - 1) * losses[i - 1] + l) / period
                 gains[i] = avg_g
                 losses[i] = avg_l
                 rs = avg_g / avg_l if avg_l != 0 else (1.0 if avg_g == 0 else 100.0)
