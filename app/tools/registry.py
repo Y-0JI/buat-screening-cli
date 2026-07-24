@@ -17,5 +17,10 @@ class ProviderRegistry:
             raise ValueError("No provider registered")
         return self._providers[key]
 
+    def set_default(self, name: str) -> None:
+        if name not in self._providers:
+            raise ValueError(f"Provider '{name}' not registered. Available: {list(self._providers)}")
+        self._default = name
+
     def list(self) -> dict[str, StockProvider]:
         return dict(self._providers)
