@@ -67,8 +67,11 @@ def print_gainer_loser_table(results: list[dict], title: str = "Top") -> None:
     table.add_column("#", style="dim")
     table.add_column("Ticker", style="cyan")
     table.add_column("Harga")
+    table.add_column("Perubahan")
     for i, r in enumerate(results, 1):
-        table.add_row(str(i), r["ticker"], f"{r['price']:,.0f}")
+        change = r.get("change", 0)
+        style = "green" if change >= 0 else "red"
+        table.add_row(str(i), r["ticker"], f"{r['price']:,.0f}", f"[{style}]{change:+.2f}%[/{style}]")
     console.print(table)
 
 
