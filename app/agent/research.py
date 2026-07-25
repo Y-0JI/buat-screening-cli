@@ -84,7 +84,7 @@ def run_research(query: str) -> ResearchReport:
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
-    ])
+    ], temperature=0)
 
     executive_summary = ""
     recommendations = []

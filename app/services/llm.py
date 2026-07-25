@@ -3,7 +3,7 @@ from loguru import logger
 from app.config.settings import settings
 
 
-def chat_completion(messages: list[dict], model: str | None = None) -> str | None:
+def chat_completion(messages: list[dict], model: str | None = None, temperature: float | None = None) -> str | None:
     api_key = settings.ai_api_key
     if not api_key:
         logger.error("AI_API_KEY tidak ditemukan. Periksa .env atau salin .env.example")
@@ -28,6 +28,8 @@ def chat_completion(messages: list[dict], model: str | None = None) -> str | Non
         "messages": messages,
         "stream": False,
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
 
     try:
         with httpx.Client(timeout=30) as client:
