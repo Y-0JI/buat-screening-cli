@@ -10,13 +10,17 @@ from app.cli.formatter import print_screening_results, print_stock_header, print
 def _capture(fn, *args, **kwargs) -> str:
     console = Console(file=StringIO(), width=120)
     import app.cli.formatter as f
-    original = f.console
+    import app.presenters.rich_presenter as rp
+    original_f = f.console
+    original_rp = rp.console
     f.console = console
+    rp.console = console
     try:
         fn(*args, **kwargs)
         return console.file.getvalue()
     finally:
-        f.console = original
+        f.console = original_f
+        rp.console = original_rp
 
 
 def test_print_screening_results_empty_snapshot():

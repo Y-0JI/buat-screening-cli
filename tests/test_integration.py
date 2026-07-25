@@ -5,7 +5,7 @@ from app.cli.main import app
 runner = CliRunner()
 
 
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+@patch("app.services.stock_list.get_all", return_value=[{"ticker": "BBCA"}])
 def test_cli_analyze_flow(mock_stocks):
     result = runner.invoke(app, ["analyze", "BBCA"])
     assert result.exit_code in (0, 1)
@@ -31,13 +31,13 @@ def test_cli_help_flow():
     assert result.exit_code == 0
 
 
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+@patch("app.services.stock_list.get_all", return_value=[{"ticker": "BBCA"}])
 def test_cli_screen_flow(mock_stocks):
     result = runner.invoke(app, ["screen", "--limit", "3"])
     assert result.exit_code == 0
 
 
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA"}])
+@patch("app.services.stock_list.get_all", return_value=[{"ticker": "BBCA"}])
 def test_cli_gainers_flow(mock_stocks):
     result = runner.invoke(app, ["gainers"])
     assert result.exit_code == 0
