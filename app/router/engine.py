@@ -1,3 +1,5 @@
+import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from app.tools import get_provider
@@ -73,6 +75,7 @@ def build_context(data: StockData) -> dict:
 
 
 def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
+    time.sleep(random.uniform(0, 0.15))
     data = provider.fetch(t, period="3mo")
     if not data:
         price = provider.get_price(t)
@@ -108,12 +111,17 @@ def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     return sorted(results, key=lambda r: r["max_confidence"], reverse=True), invalid, failed
 
 
+def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
+    time.sleep(random.uniform(0, 0.15))
+    return provider.fetch(t, period)
+
+
 def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
             try:
@@ -136,7 +144,7 @@ def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     invalid = []
     failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
             try:

@@ -1,3 +1,4 @@
+import random
 import time
 import yfinance as yf
 from loguru import logger
@@ -58,9 +59,9 @@ class YahooFinanceProvider(StockProvider):
                         logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
                     return None
                 if attempt < 2:
-                    wait = 1 + attempt
-                    logger.info(f"Retry {ticker} in {wait}s (attempt {attempt+1}/3): {e}")
-                    time.sleep(wait)
+                    delay = (1 + attempt) * random.uniform(0.5, 1.5)
+                    logger.info(f"Retry {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
+                    time.sleep(delay)
                 else:
                     logger.warning(f"Gagal fetch {ticker} setelah 3 percobaan: {e}")
                     return None
