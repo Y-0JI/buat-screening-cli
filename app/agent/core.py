@@ -97,15 +97,20 @@ def compare_with_ai(tickers: list[str]) -> dict:
     }
 
 
-def ask_llm(user_query: str, context: str = "") -> str | None:
+def ask_llm(user_query: str, context: str = "", messages: list[dict] | None = None) -> str | None:
     system_prompt = _load_prompt("system.md")
-    messages = [{"role": "system", "content": system_prompt}]
-    if context:
-        messages.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion: {user_query}"})
+    if messages is not None:
+        if not any(m.get("role") == "system" for m in messages):
+            messages = [{"role": "system", "content": system_prompt}] + messages
+        msgs = messages + [{"role": "user", "content": user_query}]
     else:
-        messages.append({"role": "user", "content": user_query})
+        msgs = [{"role": "system", "content": system_prompt}]
+        if context:
+            msgs.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion: {user_query}"})
+        else:
+            msgs.append({"role": "user", "content": user_query})
 
-    resp = chat_completion(messages)
+    resp = chat_completion(msgs)
     if not resp:
         return None
 
@@ -122,9 +127,9 @@ def ask_llm(user_query: str, context: str = "") -> str | None:
             result = f"Tool '{tool_name}' tidak dikenali atau gagal."
         results.append(f"[{tool_name}] {result}")
 
-    messages.append({"role": "assistant", "content": resp})
-    messages.append({"role": "user", "content": f"Hasil eksekusi tool:\n\n" + "\n\n".join(results) + "\n\nJelaskan hasil ini ke pengguna dengan bahasa natural. Jika ada tool yang gagal, sampaikan keterbatasannya."})
-    return chat_completion(messages) or resp
+    msgs.append({"role": "assistant", "content": resp})
+    msgs.append({"role": "user", "content": f"Hasil eksekusi tool:\n\n" + "\n\n".join(results) + "\n\nJelaskan hasil ini ke pengguna dengan bahasa natural. Jika ada tool yang gagal, sampaikan keterbatasannya."})
+    return chat_completion(msgs) or resp
 
 
 def _run_tool(name: str, args: list[str]) -> str | None:
