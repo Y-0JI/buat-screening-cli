@@ -37,7 +37,7 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
-    ])
+    ], temperature=0)
 
     if llm_result:
         return AIAnalysis(
@@ -83,7 +83,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
-    ])
+    ], temperature=0)
 
     analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
     if failed:
