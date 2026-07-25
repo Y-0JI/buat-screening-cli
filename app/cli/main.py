@@ -2,13 +2,13 @@ import sys
 import typer
 from app.config.settings import settings
 from app.utils.logging import setup_logging
-from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
-from app.agent.research import run_research
-from app.cli.formatter import print_ai_analysis, print_error, print_info, print_research_report, console
-from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
-from app.cli.formatter import print_stock_header, print_screening_results, print_bulk_screening, print_gainer_loser_table
+from app.engine.capabilities import analyze_stock, compare_stocks, run_research_query, ask_question
+from app.engine.capabilities import get_trend, get_score, screen_stocks, list_stocks
+from app.engine.capabilities import fetch_stock_data
+from app.cli.formatter import console, print_ai_analysis, print_error, print_info
+from app.cli.formatter import print_research_report, print_stock_header
+from app.cli.formatter import print_screening_results, print_bulk_screening, print_gainer_loser_table
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
-from app.services.stock_list import get_all, search
 from app.services.llm import chat_completion
 from app.agent.core import _load_prompt
 from typing import Optional
@@ -34,31 +34,33 @@ def main() -> None:
 @app.command()
 def analyze(ticker: str) -> None:
     with console.status(f"[bold blue]Menganalisis {ticker.upper()}..."):
-        result = analyze_with_ai(ticker)
+        result = analyze_stock(ticker)
     print_ai_analysis(result)
 
 
 @app.command()
 def trend(ticker: str) -> None:
-    data = fetch_stock(ticker)
-    if not data:
+    ctx = get_trend(ticker)
+    if not ctx:
         print_error(f"Data untuk {ticker.upper()} tidak ditemukan")
         raise typer.Exit(1)
-    ctx = build_context(data)
-    print_stock_header(data)
+    print_stock_header(fetch_stock_data(ticker))
     info_text = f"Indikator: {ctx['indicators']}\nScreening: {ctx['screening']}"
     console.print(f"[bold]Info Teknikal:[/bold]\n{info_text}")
 
 
 @app.command()
 def score(ticker: str) -> None:
-    data = fetch_stock(ticker)
+    data = fetch_stock_data(ticker)
     if not data:
         print_error(f"Data untuk {ticker.upper()} tidak ditemukan")
         raise typer.Exit(1)
-    results = run_screening(data)
+    results = get_score(ticker)
     print_stock_header(data)
-    print_screening_results(results)
+    if results:
+        print_screening_results(results)
+    else:
+        print_info("Tidak ada sinyal screening ditemukan")
 
 
 @app.command()
@@ -69,7 +71,7 @@ def compare(
     tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
     tickers = [t.strip().upper() for t in tickers_str.replace(",", " ").split()]
     with console.status(f"[bold blue]Membandingkan {', '.join(tickers)}..."):
-        result = compare_with_ai(tickers)
+        result = compare_stocks(tickers)
     if result["type"] == "error":
         print_error(result["message"])
         raise typer.Exit(1)
@@ -84,21 +86,19 @@ def screen(
     sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
-    tickers = [s["ticker"] for s in get_all()]
-    with console.status(f"[bold blue]Screening {len(tickers)} saham..."):
-        results = bulk_screen(tickers)
-    if sector:
-        results = [r for r in results if r.get("sector") and sector.lower() in r["sector"].lower()]
-    if limit:
-        results = results[:limit]
+    with console.status(f"[bold blue]Screening saham..."):
+        results = screen_stocks(sector, limit)
     if not results:
         print_info("Tidak ada sinyal screening ditemukan")
         return
-    print_bulk_screening(results, title=f"Hasil Screening{' — ' + sector if sector else ''}")
+    title = f"Hasil Screening{' — ' + sector if sector else ''}"
+    print_bulk_screening(results, title=title)
 
 
 @app.command()
 def gainers(limit: int = 10) -> None:
+    from app.router.engine import bulk_gainers
+    from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results = bulk_gainers(tickers)
@@ -107,6 +107,8 @@ def gainers(limit: int = 10) -> None:
 
 @app.command()
 def losers(limit: int = 10) -> None:
+    from app.router.engine import bulk_losers
+    from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results = bulk_losers(tickers)
@@ -115,19 +117,17 @@ def losers(limit: int = 10) -> None:
 
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
-    tickers = [s["ticker"] for s in get_all()]
-    with console.status(f"[bold blue]Screening {len(tickers)} saham sektor {name}..."):
-        results = bulk_screen(tickers)
-    filtered = [r for r in results if r.get("sector") and name.lower() in r["sector"].lower()]
-    if not filtered:
+    with console.status(f"[bold blue]Screening {len(name)} saham sektor {name}..."):
+        results = screen_stocks(name)
+    if not results:
         print_info(f"Tidak ada sinyal screening di sektor {name}")
         return
-    print_bulk_screening(filtered, title=f"Hasil Screening — {name}")
+    print_bulk_screening(results, title=f"Hasil Screening — {name}")
 
 
 @app.command()
 def stocks(query: Optional[str] = typer.Argument(None, help="Cari kode/nama saham")) -> None:
-    all_stocks = search(query) if query else get_all()
+    all_stocks = list_stocks(query)
     console.print(f"[bold]Total: {len(all_stocks)} saham[/bold]")
     for s in all_stocks[:30]:
         console.print(f"  [cyan]{s['ticker']}[/cyan] - {s['name']}")
@@ -151,7 +151,7 @@ def natural(query: str) -> None:
     elif intent == "help":
         info()
     else:
-        resp = ask_llm(query)
+        resp = ask_question(query)
         if resp:
             console.print(resp)
         else:
@@ -161,7 +161,7 @@ def natural(query: str) -> None:
 @app.command()
 def research(query: str) -> None:
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
-        report = run_research(query)
+        report = run_research_query(query)
     print_research_report(report)
 
 
