@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, timedelta
 from app.tools import get_provider
 from app.screeners.engine import screen_stock
 
@@ -12,11 +13,52 @@ def fetch_stock(ticker: str) -> StockData | None:
     return provider.fetch(ticker)
 
 
+INDICATOR_MIN_REQUIREMENTS = {
+    "RSI": 14,
+    "SMA20": 20,
+    "SMA50": 50,
+    "SMA200": 200,
+    "MACD": 36,
+    "Bollinger": 20,
+}
+
+
+def build_data_quality_report(data: StockData) -> dict:
+    history = data.history
+    history_days = len(history)
+    last_trade = history[-1].date if history else None
+    days_since = (date.today() - last_trade).days if last_trade else None
+
+    available = []
+    missing = []
+    for indicator, min_req in INDICATOR_MIN_REQUIREMENTS.items():
+        if history_days >= min_req:
+            available.append(indicator)
+        else:
+            missing.append(f"{indicator} (butuh {min_req} hari)")
+
+    caveats = []
+    if days_since is not None and days_since > 3:
+        caveats.append(f"Data terakhir {days_since} hari lalu ({last_trade}). Analisis mungkin tidak反映 kondisi terkini.")
+    if missing:
+        caveats.append(f"Indikator belum tersedia: {', '.join(missing)}. Kesimpulan tentang indikator ini mungkin tidak akurat.")
+
+    return {
+        "history_days": history_days,
+        "last_trade_date": str(last_trade) if last_trade else None,
+        "days_since_last_trade": days_since,
+        "available_indicators": available,
+        "missing_indicators": missing,
+        "data_caveats": caveats,
+    }
+
+
 def run_screening(data: StockData) -> list[ScreeningResult]:
     return screen_stock(data)
 
 
 def build_context(data: StockData) -> dict:
+    dq = build_data_quality_report(data)
     return {
         "ticker": data.info.ticker,
         "name": data.info.name,
@@ -25,6 +67,8 @@ def build_context(data: StockData) -> dict:
         "change": _calc_change(data),
         "indicators": _calc_indicators(data),
         "screening": _summarize_screening(data),
+        "data_quality": f"Riwayat: {dq['history_days']} hari perdagangan",
+        "data_caveats": dq['data_caveats'],
     }
 
 
