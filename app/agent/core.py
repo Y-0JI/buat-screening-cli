@@ -1,16 +1,20 @@
 import re
+import os
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
 from app.models.analysis import AIAnalysis
 from app.services.llm import chat_completion
 from app.services.stock_list import search
 
+_PROMPT_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
+
 
 def _load_prompt(name: str) -> str:
+    path = os.path.join(_PROMPT_DIR, name)
     try:
-        with open(f"app/prompts/{name}") as f:
+        with open(path) as f:
             return f.read()
     except FileNotFoundError:
-        with open("app/prompts/system.md") as f:
+        with open(os.path.join(_PROMPT_DIR, "system.md")) as f:
             return f.read()
 
 

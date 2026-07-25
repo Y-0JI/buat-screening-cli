@@ -1,60 +1,26 @@
 from dataclasses import dataclass
 from typing import Literal
-import re
 from app.agent.core import analyze_with_ai, compare_with_ai, _load_prompt
 from app.router.engine import fetch_stock, bulk_screen, build_context
 from app.services.llm import chat_completion
 from app.services.stock_list import get_all
-
-
-@dataclass
-class ResearchIntent:
-    type: Literal["single_stock", "sector_theme", "comparative", "screening_only", "analyze_only"]
-    tickers: list[str]
-    sector: str | None
-    raw_query: str
+from app.parser.intent import detect_research_intent, ResearchIntent
+from app.models.analysis import AIAnalysis
 
 
 @dataclass
 class ResearchReport:
     intent: ResearchIntent
     screening_results: list[dict] | None
-    analyses: dict[str, "AIAnalysis"] | None
+    analyses: dict[str, AIAnalysis] | None
     comparison: dict | None
     data_quality: dict[str, list[str]]
     recommendations: list[str]
     executive_summary: str
 
 
-def detect_intent(query: str) -> ResearchIntent:
-    q = query.lower().strip()
-    words = q.split()
-
-    ticker_match = re.search(r'\b([A-Z]{3,5})\b', query.upper())
-    if ticker_match and len(words) <= 3:
-        return ResearchIntent("single_stock", [ticker_match.group(1)], None, query)
-    if any(w in q for w in ["analisa", "analisis", "analyze"]):
-        for w in words:
-            if w.isalpha() and 3 <= len(w) <= 5:
-                return ResearchIntent("single_stock", [w.upper()], None, query)
-
-    if any(w in q for w in ["bandingkan", "bandingin", "compare", "vs", "versus"]):
-        tickers = [w.upper() for w in words if w.isalpha() and 3 <= len(w) <= 5]
-        if len(tickers) >= 2:
-            return ResearchIntent("comparative", tickers[:2], None, query)
-
-    sector_keywords = ["sektor", "sector", "screening", "cari", "temukan", "saham", "bagus"]
-    if any(w in q for w in sector_keywords):
-        for i, w in enumerate(words):
-            if w in ["sektor", "sector"] and i + 1 < len(words):
-                return ResearchIntent("sector_theme", [], words[i + 1].title(), query)
-        return ResearchIntent("sector_theme", [], None, query)
-
-    return ResearchIntent("sector_theme", [], None, query)
-
-
 def run_research(query: str) -> ResearchReport:
-    intent = detect_intent(query)
+    intent = detect_research_intent(query)
 
     screening_results = None
     analyses = None
