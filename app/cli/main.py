@@ -9,8 +9,6 @@ from app.cli.formatter import console, print_ai_analysis, print_error, print_inf
 from app.cli.formatter import print_research_report, print_stock_header
 from app.cli.formatter import print_screening_results, print_bulk_screening, print_gainer_loser_table
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
-from app.services.llm import chat_completion
-from app.agent.core import _load_prompt
 from typing import Optional
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
@@ -167,19 +165,19 @@ def research(query: str) -> None:
 
 @app.command()
 def chat() -> None:
-    system_prompt = _load_prompt("system.md")
-    messages = [{"role": "system", "content": system_prompt}]
     console.print("[bold]Mode diskusi. Ketik 'exit' atau Ctrl-C untuk keluar.[/bold]")
+    history: list[str] = []
     while True:
         try:
             query = console.input("[bold cyan]>> [/bold cyan]")
             if query.lower() in ("exit", "quit", "keluar"):
                 break
-            messages.append({"role": "user", "content": query})
-            resp = chat_completion(messages)
+            context = "\n".join(history[-6:]) if history else ""
+            resp = ask_question(query, context)
             if resp:
                 console.print(resp)
-                messages.append({"role": "assistant", "content": resp})
+                history.append(f"User: {query}")
+                history.append(f"AI: {resp}")
             else:
                 print_error("AI tidak merespon. Periksa konfigurasi .env")
         except (EOFError, KeyboardInterrupt):
