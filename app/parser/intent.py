@@ -7,6 +7,7 @@ INTENT_GAINERS = "gainers"
 INTENT_LOSERS = "losers"
 INTENT_STOCKS = "stocks"
 INTENT_HELP = "help"
+INTENT_RESEARCH = "research"
 INTENT_UNKNOWN = "unknown"
 
 
@@ -34,6 +35,9 @@ def parse(text: str) -> tuple[str, dict]:
 
     if re.search(r"\b(?:info|help|bantuan|tolong|halo|hai|menu|perintah|command)\b", text_lower):
         return INTENT_HELP, {}
+
+    if re.search(r"\b(?:riset|research|penelitian|studi)\b", text_lower):
+        return INTENT_RESEARCH, {"text": text}
 
     if re.search(r"breakout|golden\s*cross|screening|saham\s+apa|rekomendasi|cari\s+saham", text_lower):
         return INTENT_SCREEN, {"type": "all"}

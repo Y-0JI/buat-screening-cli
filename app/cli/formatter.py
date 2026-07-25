@@ -123,3 +123,44 @@ def print_error(message: str) -> None:
 
 def print_info(message: str) -> None:
     console.print(f"[bold blue]Info:[/bold blue] {message}")
+
+def print_research_report(report) -> None:
+    from app.agent.research import ResearchReport
+    console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
+    console.print(f"[bold]Query:[/bold] {report.intent.raw_query}")
+    console.print(f"[bold]Tipe Riset:[/bold] {report.intent.type}")
+    console.print()
+
+    if report.executive_summary:
+        console.print(Panel(report.executive_summary, title="[bold]Ringkasan Eksekutif[/bold]", border_style="cyan"))
+        console.print()
+
+    if report.screening_results:
+        table = Table(title="Hasil Screening")
+        table.add_column("Ticker", style="cyan")
+        table.add_column("Sektor")
+        table.add_column("Sinyal", style="bold")
+        table.add_column("Confidence")
+        for r in report.screening_results[:15]:
+            ts = r.get("top_signal")
+            signal_style = "green" if ts and ts.signal == "BUY" else "red" if ts and ts.signal == "SELL" else "yellow"
+            table.add_row(r["ticker"], r.get("sector", "")[:15], f"[{signal_style}]{ts.signal if ts else 'N/A'}[/{signal_style}]", f"{ts.confidence:.0%}" if ts else "0%")
+        console.print(table)
+        console.print()
+
+    if report.analyses:
+        for ticker, a in report.analyses.items():
+            header = f"{ticker}"
+            if report.data_quality.get(ticker):
+                header += f" ⚠ {', '.join(report.data_quality[ticker])}"
+            console.print(Panel(a.summary, title=f"[bold]Analisis {header}[/bold]", border_style="blue"))
+            console.print()
+
+    if report.comparison and report.comparison.get("analysis"):
+        console.print(Panel(report.comparison["analysis"], title="[bold]Perbandingan[/bold]", border_style="magenta"))
+        console.print()
+
+    if report.recommendations:
+        rec_text = "\n".join(f"{i+1}. {r}" for i, r in enumerate(report.recommendations))
+        console.print(Panel(rec_text, title="[bold green]Rekomendasi[/bold green]", border_style="green"))
+

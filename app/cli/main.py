@@ -3,17 +3,18 @@ import typer
 from app.config.settings import settings
 from app.utils.logging import setup_logging
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
-from app.cli.formatter import print_ai_analysis, print_error, print_info, console
+from app.agent.research import run_research
+from app.cli.formatter import print_ai_analysis, print_error, print_info, print_research_report, console
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
 from app.cli.formatter import print_stock_header, print_screening_results, print_bulk_screening, print_gainer_loser_table
-from app.parser.intent import INTENT_UNKNOWN, parse
+from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.stock_list import get_all, search
 from app.services.llm import chat_completion
 from app.agent.core import _load_prompt
 from typing import Optional
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
-                   "losers", "sector", "stocks", "natural", "info", "chat"}
+                   "losers", "sector", "stocks", "natural", "info", "chat", "research"}
 
 def _reroute_unknown_to_natural():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
@@ -143,6 +144,8 @@ def natural(query: str) -> None:
     elif intent == "screen":
         sector_filter = params.get("sector")
         screen(sector=sector_filter)
+    elif intent == "research":
+        research(params.get("text", query))
     elif intent == "help":
         info()
     else:
@@ -151,6 +154,13 @@ def natural(query: str) -> None:
             console.print(resp)
         else:
             print_error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'info'")
+
+
+@app.command()
+def research(query: str) -> None:
+    with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
+        report = run_research(query)
+    print_research_report(report)
 
 
 @app.command()
@@ -189,6 +199,7 @@ def info() -> None:
     console.print("  stocks [query]       - Daftar saham")
     console.print("  chat                 - Mode diskusi interaktif")
     console.print('  "[query]"            - Bahasa natural (contoh: "BBCA" atau "analisa BBCA")')
+    console.print("  research [query]     - Riset end-to-end (screening+analisis+perbandingan)")
     console.print("  info                 - Bantuan ini")
 
 
