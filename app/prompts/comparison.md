@@ -9,5 +9,6 @@ Panduan:
 3. Jelaskan mana yang lebih berisiko dan KENAPA.
 4. Akhiri dengan rekomendasi dan alasan.
 5. Jangan ulang semua data mentah — fokus pada insight dan perbedaan yang berarti.
+6. Jika ada saham dengan data kualitas rendah (riwayat pendek, indikator tidak lengkap), akui dan jelaskan dampaknya pada perbandingan.
 
 Hanya gunakan data di atas.

@@ -8,6 +8,10 @@ DATA:
 - Perubahan: {{change}}
 - Indikator: {{indicators}}
 - Screening: {{screening}}
+- Kualitas Data: {{data_quality}}
+{% if data_caveats %}
+- Keterbatasan Data: {{data_caveats}}
+{% endif %}
 
 Panduan:
 1. Mulai dengan ringkasan kondisi saat ini.
@@ -16,5 +20,6 @@ Panduan:
 4. Akhiri dengan kesimpulan dan alasan di baliknya.
 5. Sesuaikan kedalaman: jika pertanyaan pendek, cukup poin utama. Jika detail, bahas lebih dalam.
 6. Variasikan struktur — jangan pakai format yang sama persis setiap analisis.
+7. Jika ada keterbatasan data (Kualitas Data atau Keterbatasan Data), akui dan jelaskan dampaknya pada analisis. Jangan berikan kesimpulan definitif jika confidence rendah karena data tidak lengkap.
 
 Gunakan bahasa yang enak dibaca. Jangan hanya mengulang angka-angka dari data — jelaskan apa artinya. Tapi jangan pernah menambah informasi di luar data yang diberikan.
