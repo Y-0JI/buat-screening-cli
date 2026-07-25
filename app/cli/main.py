@@ -5,6 +5,7 @@ from app.utils.logging import setup_logging
 from app.engine.capabilities import analyze_stock, compare_stocks, run_research_query, ask_question
 from app.engine.capabilities import get_trend, get_score, screen_stocks, list_stocks
 from app.engine.capabilities import fetch_stock_data
+from app.agent.core import ask_llm
 from app.cli.formatter import console, print_ai_analysis, print_error, print_info
 from app.cli.formatter import print_research_report, print_stock_header
 from app.cli.formatter import print_screening_results, print_bulk_screening, print_gainer_loser_table
@@ -166,18 +167,17 @@ def research(query: str) -> None:
 @app.command()
 def chat() -> None:
     console.print("[bold]Mode diskusi. Ketik 'exit' atau Ctrl-C untuk keluar.[/bold]")
-    history: list[str] = []
+    messages: list[dict] = []
     while True:
         try:
             query = console.input("[bold cyan]>> [/bold cyan]")
             if query.lower() in ("exit", "quit", "keluar"):
                 break
-            context = "\n".join(history[-6:]) if history else ""
-            resp = ask_question(query, context)
+            resp = ask_llm(query, messages=messages)
             if resp:
                 console.print(resp)
-                history.append(f"User: {query}")
-                history.append(f"AI: {resp}")
+                messages.append({"role": "user", "content": query})
+                messages.append({"role": "assistant", "content": resp})
             else:
                 print_error("AI tidak merespon. Periksa konfigurasi .env")
         except (EOFError, KeyboardInterrupt):
