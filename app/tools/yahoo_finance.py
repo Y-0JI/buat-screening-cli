@@ -4,6 +4,23 @@ from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.tools.base import StockProvider
 
+_NOT_FOUND_PATTERNS = [
+    "possibly delisted",
+    "quote not found",
+    "http 404",
+    "no data found",
+    "no data available",
+    "symbol may be delisted",
+]
+
+
+def _classify_error(e: Exception) -> str:
+    msg = str(e).lower()
+    for pat in _NOT_FOUND_PATTERNS:
+        if pat in msg:
+            return "not_found"
+    return "error"
+
 
 class YahooFinanceProvider(StockProvider):
     def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
@@ -35,6 +52,11 @@ class YahooFinanceProvider(StockProvider):
                 ]
                 return StockData(info=stock_info, history=history)
             except Exception as e:
+                kind = _classify_error(e)
+                if kind == "not_found":
+                    if attempt == 0:
+                        logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
+                    return None
                 if attempt < 2:
                     wait = 1 + attempt
                     logger.info(f"Retry {ticker} in {wait}s (attempt {attempt+1}/3): {e}")

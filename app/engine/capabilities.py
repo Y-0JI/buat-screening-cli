@@ -23,14 +23,14 @@ def run_research_query(query: str):
     return run_research(query)
 
 
-def screen_stocks(sector: str | None = None, limit: int = 10) -> tuple[list[dict], list[str]]:
+def screen_stocks(sector: str | None = None, limit: int = 10) -> tuple[list[dict], list[str], list[str]]:
     tickers = [s["ticker"] for s in get_all()]
-    results, failed = bulk_screen(tickers)
+    results, invalid, failed = bulk_screen(tickers)
     if sector:
         results = [r for r in results if r.get("sector") and sector.lower() in r["sector"].lower()]
     if limit:
         results = results[:limit]
-    return results, failed
+    return results, invalid, failed
 
 
 def get_trend(ticker: str) -> dict | None:
