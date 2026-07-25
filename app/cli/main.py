@@ -33,7 +33,8 @@ def main() -> None:
 
 @app.command()
 def analyze(ticker: str) -> None:
-    result = analyze_with_ai(ticker)
+    with console.status(f"[bold blue]Menganalisis {ticker.upper()}..."):
+        result = analyze_with_ai(ticker)
     print_ai_analysis(result)
 
 
@@ -67,7 +68,8 @@ def compare(
 ) -> None:
     tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
     tickers = [t.strip().upper() for t in tickers_str.replace(",", " ").split()]
-    result = compare_with_ai(tickers)
+    with console.status(f"[bold blue]Membandingkan {', '.join(tickers)}..."):
+        result = compare_with_ai(tickers)
     if result["type"] == "error":
         print_error(result["message"])
         raise typer.Exit(1)

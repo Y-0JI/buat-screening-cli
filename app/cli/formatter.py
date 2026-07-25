@@ -126,6 +126,9 @@ def print_info(message: str) -> None:
 
 def print_research_report(report) -> None:
     from app.agent.research import ResearchReport
+    if not isinstance(report, ResearchReport):
+        print_error("Invalid research report format")
+        return
     console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
     console.print(f"[bold]Query:[/bold] {report.intent.raw_query}")
     console.print(f"[bold]Tipe Riset:[/bold] {report.intent.type}")

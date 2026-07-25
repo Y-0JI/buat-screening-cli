@@ -1,4 +1,7 @@
 import re
+from dataclasses import dataclass
+from typing import Literal
+
 
 INTENT_ANALYZE = "analyze"
 INTENT_SCREEN = "screen"
@@ -9,6 +12,41 @@ INTENT_STOCKS = "stocks"
 INTENT_HELP = "help"
 INTENT_RESEARCH = "research"
 INTENT_UNKNOWN = "unknown"
+
+
+@dataclass
+class ResearchIntent:
+    type: Literal["single_stock", "sector_theme", "comparative", "screening_only", "analyze_only"]
+    tickers: list[str]
+    sector: str | None
+    raw_query: str
+
+
+def detect_research_intent(query: str) -> ResearchIntent:
+    q = query.lower().strip()
+    words = q.split()
+
+    ticker_match = re.search(r'\b([A-Z]{3,5})\b', query.upper())
+    if ticker_match and len(words) <= 3:
+        return ResearchIntent("single_stock", [ticker_match.group(1)], None, query)
+    if any(w in q for w in ["analisa", "analisis", "analyze"]):
+        for w in words:
+            if w.isalpha() and 3 <= len(w) <= 5:
+                return ResearchIntent("single_stock", [w.upper()], None, query)
+
+    if any(w in q for w in ["bandingkan", "bandingin", "compare", "vs", "versus"]):
+        tickers = [w.upper() for w in words if w.isalpha() and 3 <= len(w) <= 5]
+        if len(tickers) >= 2:
+            return ResearchIntent("comparative", tickers[:2], None, query)
+
+    sector_keywords = ["sektor", "sector", "screening", "cari", "temukan", "saham", "bagus"]
+    if any(w in q for w in sector_keywords):
+        for i, w in enumerate(words):
+            if w in ["sektor", "sector"] and i + 1 < len(words):
+                return ResearchIntent("sector_theme", [], words[i + 1].title(), query)
+        return ResearchIntent("sector_theme", [], None, query)
+
+    return ResearchIntent("sector_theme", [], None, query)
 
 
 def parse(text: str) -> tuple[str, dict]:
