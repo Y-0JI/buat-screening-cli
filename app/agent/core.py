@@ -174,38 +174,53 @@ def _run_tool(name: str, args: list[str]) -> str | None:
     if name == "screen":
         from app.services.stock_list import get_all
         tickers = [s["ticker"] for s in get_all()]
-        results = bulk_screen(tickers)
+        results, failed = bulk_screen(tickers)
         sector_filter = args[0] if args else None
         if sector_filter:
             results = [r for r in results if r.get("sector") and sector_filter.lower() in r["sector"].lower()]
         if not results:
-            return "Tidak ada sinyal screening ditemukan."
+            msg = "Tidak ada sinyal screening ditemukan."
+            if failed:
+                msg += f" ({len(failed)} saham gagal diproses)"
+            return msg
         lines = ["Hasil screening:"]
         for r in results[:10]:
             ts = r["top_signal"]
             lines.append(f"- {r['ticker']} ({r.get('sector', '-')}): {ts.signal} ({ts.confidence:.0%}) - {ts.reason}")
+        if failed:
+            lines.append(f"⚠ {len(failed)} saham gagal diproses")
         return "\n".join(lines)
 
     if name == "gainers":
         from app.services.stock_list import get_all
         tickers = [s["ticker"] for s in get_all()]
-        results = bulk_gainers(tickers)
+        results, failed = bulk_gainers(tickers)
         if not results:
-            return "Tidak ada data gainers."
+            msg = "Tidak ada data gainers."
+            if failed:
+                msg += f" ({len(failed)} saham gagal diproses)"
+            return msg
         lines = ["Top gainers:"]
         for r in results[:10]:
             lines.append(f"- {r['ticker']}: {r['price']:,.0f} ({r['change']:+.2f}%)")
+        if failed:
+            lines.append(f"⚠ {len(failed)} saham gagal diproses")
         return "\n".join(lines)
 
     if name == "losers":
         from app.services.stock_list import get_all
         tickers = [s["ticker"] for s in get_all()]
-        results = bulk_losers(tickers)
+        results, failed = bulk_losers(tickers)
         if not results:
-            return "Tidak ada data losers."
+            msg = "Tidak ada data losers."
+            if failed:
+                msg += f" ({len(failed)} saham gagal diproses)"
+            return msg
         lines = ["Top losers:"]
         for r in results[:10]:
             lines.append(f"- {r['ticker']}: {r['price']:,.0f} ({r['change']:+.2f}%)")
+        if failed:
+            lines.append(f"⚠ {len(failed)} saham gagal diproses")
         return "\n".join(lines)
 
     if name == "search":

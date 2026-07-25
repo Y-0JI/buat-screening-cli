@@ -72,13 +72,13 @@ def build_context(data: StockData) -> dict:
     }
 
 
-def _fetch_and_screen(t: str) -> dict | None:
+def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
     data = provider.fetch(t, period="3mo")
     if not data:
-        return None
+        return None, "Gagal mengambil data"
     signals = screen_stock(data)
     if not signals:
-        return None
+        return None, None
     return {
         "ticker": t,
         "name": data.info.name,
@@ -87,48 +87,63 @@ def _fetch_and_screen(t: str) -> dict | None:
         "signals": signals,
         "max_confidence": max(s.confidence for s in signals),
         "top_signal": max(signals, key=lambda s: s.confidence),
-    }
+    }, None
 
 
-def bulk_screen(tickers: list[str]) -> list[dict]:
+def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str]]:
     results = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        for r in ex.map(_fetch_and_screen, tickers):
-            if r:
+        for r, err in ex.map(_fetch_and_screen, tickers):
+            if err:
+                failed.append(err)
+            elif r:
                 results.append(r)
-    return sorted(results, key=lambda r: r["max_confidence"], reverse=True)
+    return sorted(results, key=lambda r: r["max_confidence"], reverse=True), failed
 
 
-def bulk_gainers(tickers: list[str]) -> list[dict]:
+def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str]]:
     results = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
         futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
-            data = f.result()
-            if data and len(data.history) >= 2:
-                prices = data.history
-                price = prices[-1].close
-                prev = prices[-2].close
-                change = ((price - prev) / prev) * 100 if prev else 0.0
-                results.append({"ticker": t, "price": price, "change": round(change, 2)})
-    return sorted(results, key=lambda r: r["change"], reverse=True)[:10]
+            try:
+                data = f.result()
+                if data and len(data.history) >= 2:
+                    prices = data.history
+                    price = prices[-1].close
+                    prev = prices[-2].close
+                    change = ((price - prev) / prev) * 100 if prev else 0.0
+                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
+                else:
+                    failed.append(f"{t}: Data tidak cukup")
+            except Exception as e:
+                failed.append(f"{t}: {e}")
+    return sorted(results, key=lambda r: r["change"], reverse=True)[:10], failed
 
 
-def bulk_losers(tickers: list[str]) -> list[dict]:
+def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str]]:
     results = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
         futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
-            data = f.result()
-            if data and len(data.history) >= 2:
-                prices = data.history
-                price = prices[-1].close
-                prev = prices[-2].close
-                change = ((price - prev) / prev) * 100 if prev else 0.0
-                results.append({"ticker": t, "price": price, "change": round(change, 2)})
-    return sorted(results, key=lambda r: r["change"])[:10]
+            try:
+                data = f.result()
+                if data and len(data.history) >= 2:
+                    prices = data.history
+                    price = prices[-1].close
+                    prev = prices[-2].close
+                    change = ((price - prev) / prev) * 100 if prev else 0.0
+                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
+                else:
+                    failed.append(f"{t}: Data tidak cukup")
+            except Exception as e:
+                failed.append(f"{t}: {e}")
+    return sorted(results, key=lambda r: r["change"])[:10], failed
 
 
 def _calc_change(data: StockData) -> str:

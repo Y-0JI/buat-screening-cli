@@ -20,9 +20,11 @@ def print_screening_results(results) -> None:
     _p.table("Hasil Screening", cols, rows)
 
 
-def print_bulk_screening(results: list[dict], title: str = "Hasil Screening") -> None:
+def print_bulk_screening(results: list[dict], title: str = "Hasil Screening", failed: list[str] | None = None) -> None:
     if not results:
         console.print("[yellow]Tidak ada sinyal screening ditemukan.[/yellow]")
+        if failed:
+            console.print(f"[dim]{len(failed)} saham gagal diproses[/dim]")
         return
     from rich.table import Table
     table = Table(title=title)
@@ -40,11 +42,15 @@ def print_bulk_screening(results: list[dict], title: str = "Hasil Screening") ->
             f"{r.get('price', 0):,.0f}", f"[{signal_style}]{ts.signal}[/{signal_style}]", f"{ts.confidence:.0%}",
         )
     console.print(table)
+    if failed:
+        console.print(f"[dim]⚠ {len(failed)} saham gagal diproses — {failed[0]}{' dan lainnya' if len(failed) > 1 else ''}[/dim]")
 
 
-def print_gainer_loser_table(results: list[dict], title: str = "Top") -> None:
+def print_gainer_loser_table(results: list[dict], title: str = "Top", failed: list[str] | None = None) -> None:
     if not results:
         console.print("[yellow]Tidak ada data.[/yellow]")
+        if failed:
+            console.print(f"[dim]{len(failed)} saham gagal diproses[/dim]")
         return
     from rich.table import Table
     table = Table(title=title)
@@ -57,6 +63,8 @@ def print_gainer_loser_table(results: list[dict], title: str = "Top") -> None:
         style = "green" if change >= 0 else "red"
         table.add_row(str(i), r["ticker"], f"{r['price']:,.0f}", f"[{style}]{change:+.2f}%[/{style}]")
     console.print(table)
+    if failed:
+        console.print(f"[dim]⚠ {len(failed)} saham gagal diproses — {failed[0]}{' dan lainnya' if len(failed) > 1 else ''}[/dim]")
 
 
 def print_price_info(data) -> None:

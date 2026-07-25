@@ -86,12 +86,14 @@ def screen(
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
     with console.status(f"[bold blue]Screening saham..."):
-        results = screen_stocks(sector, limit)
+        results, failed = screen_stocks(sector, limit)
     if not results:
         print_info("Tidak ada sinyal screening ditemukan")
+        if failed:
+            console.print(f"[dim]⚠ {len(failed)} saham gagal diproses[/dim]")
         return
     title = f"Hasil Screening{' — ' + sector if sector else ''}"
-    print_bulk_screening(results, title=title)
+    print_bulk_screening(results, title=title, failed=failed)
 
 
 @app.command()
@@ -100,8 +102,8 @@ def gainers(limit: int = 10) -> None:
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
-        results = bulk_gainers(tickers)
-    print_gainer_loser_table(results[:limit], title="Top Gainers")
+        results, failed = bulk_gainers(tickers)
+    print_gainer_loser_table(results[:limit], title="Top Gainers", failed=failed)
 
 
 @app.command()
@@ -110,18 +112,20 @@ def losers(limit: int = 10) -> None:
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
-        results = bulk_losers(tickers)
-    print_gainer_loser_table(results[:limit], title="Top Losers")
+        results, failed = bulk_losers(tickers)
+    print_gainer_loser_table(results[:limit], title="Top Losers", failed=failed)
 
 
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
-    with console.status(f"[bold blue]Screening {len(name)} saham sektor {name}..."):
-        results = screen_stocks(name)
+    with console.status(f"[bold blue]Screening saham sektor {name}..."):
+        results, failed = screen_stocks(name)
     if not results:
         print_info(f"Tidak ada sinyal screening di sektor {name}")
+        if failed:
+            console.print(f"[dim]⚠ {len(failed)} saham gagal diproses[/dim]")
         return
-    print_bulk_screening(results, title=f"Hasil Screening — {name}")
+    print_bulk_screening(results, title=f"Hasil Screening — {name}", failed=failed)
 
 
 @app.command()

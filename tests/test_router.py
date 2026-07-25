@@ -35,8 +35,9 @@ def test_bulk_losers():
             "BBCA": _mock_stock(price=100.0, prev=110.0),
             "BBRI": _mock_stock(price=50.0, prev=60.0),
         }.get(t)
-        results = bulk_losers(["BBCA", "BBRI"])
+        results, failed = bulk_losers(["BBCA", "BBRI"])
         assert len(results) == 2
+        assert len(failed) == 0
         assert results[0]["ticker"] == "BBRI"
         assert results[0]["change"] < results[1]["change"]
 
@@ -47,7 +48,8 @@ def test_bulk_gainers():
             "BBCA": _mock_stock(price=100.0, prev=110.0),
             "BBRI": _mock_stock(price=50.0, prev=40.0),
         }.get(t)
-        results = bulk_gainers(["BBCA", "BBRI"])
+        results, failed = bulk_gainers(["BBCA", "BBRI"])
         assert len(results) == 2
+        assert len(failed) == 0
         assert results[0]["ticker"] == "BBRI"
         assert results[0]["change"] > results[1]["change"]
