@@ -29,8 +29,9 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     prompt = _load_prompt("analysis.md")
     filled = _render_template(prompt, **ctx)
 
+    system_prompt = _load_prompt("system.md")
     llm_result = chat_completion([
-        {"role": "system", "content": "Kamu adalah asisten riset saham Indonesia."},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
     ])
 
@@ -74,8 +75,9 @@ def compare_with_ai(tickers: list[str]) -> dict:
     )
     filled = prompt_template.replace("{{stocks}}", stocks_text)
 
+    system_prompt = _load_prompt("system.md")
     llm_result = chat_completion([
-        {"role": "system", "content": "Kamu adalah asisten riset saham Indonesia."},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
     ])
 
