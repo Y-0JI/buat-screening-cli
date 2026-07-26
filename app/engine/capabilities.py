@@ -33,9 +33,8 @@ def screen_stocks(sector: str | None = None, limit: int = 10) -> tuple[list[dict
     return results, invalid, failed
 
 
-def get_trend(ticker: str, data: StockData | None = None) -> dict | None:
-    if data is None:
-        data = fetch_stock(ticker)
+def get_trend(ticker: str) -> dict | None:
+    data = fetch_stock(ticker)
     if not data:
         return None
     ctx = build_context(data)
@@ -50,9 +49,8 @@ def get_trend(ticker: str, data: StockData | None = None) -> dict | None:
     }
 
 
-def get_score(ticker: str, data: StockData | None = None) -> list[ScreeningResult] | None:
-    if data is None:
-        data = fetch_stock(ticker)
+def get_score(ticker: str) -> list[ScreeningResult] | None:
+    data = fetch_stock(ticker)
     if not data:
         return None
     return run_screening(data)

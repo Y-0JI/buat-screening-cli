@@ -39,12 +39,11 @@ def analyze(ticker: str) -> None:
 
 @app.command()
 def trend(ticker: str) -> None:
-    data = fetch_stock_data(ticker)
-    if not data:
+    ctx = get_trend(ticker)
+    if not ctx:
         print_error(f"Data untuk {ticker.upper()} tidak ditemukan")
         raise typer.Exit(1)
-    ctx = get_trend(ticker, data=data)
-    print_stock_header(data)
+    print_stock_header(fetch_stock_data(ticker))
     info_text = f"Indikator: {ctx['indicators']}\nScreening: {ctx['screening']}"
     console.print(f"[bold]Info Teknikal:[/bold]\n{info_text}")
 
@@ -55,7 +54,7 @@ def score(ticker: str) -> None:
     if not data:
         print_error(f"Data untuk {ticker.upper()} tidak ditemukan")
         raise typer.Exit(1)
-    results = get_score(ticker, data=data)
+    results = get_score(ticker)
     print_stock_header(data)
     if results:
         print_screening_results(results)

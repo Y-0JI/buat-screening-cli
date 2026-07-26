@@ -6,7 +6,6 @@ from app.services.llm import chat_completion
 from app.services.stock_list import get_all
 from app.parser.intent import detect_research_intent, ResearchIntent
 from app.models.analysis import AIAnalysis
-from app.models.stock import StockData
 
 
 @dataclass
@@ -37,17 +36,15 @@ def run_research(query: str) -> ResearchReport:
         screening_results = results
         if top:
             analyses = {}
-            prefetched: dict[str, StockData] = {}
             for r in top:
                 t = r["ticker"]
                 data = fetch_stock(t)
                 if data:
-                    prefetched[t] = data
                     ctx = build_context(data)
                     data_quality[t] = ctx.get("data_caveats", [])
-                    analyses[t] = analyze_with_ai(t, data=data)
+                    analyses[t] = analyze_with_ai(t)
             if len(analyses) > 1:
-                comparison = compare_with_ai(list(analyses.keys()), prefetched=prefetched)
+                comparison = compare_with_ai(list(analyses.keys()))
 
     elif intent.type == "single_stock":
         t = intent.tickers[0]
@@ -55,7 +52,7 @@ def run_research(query: str) -> ResearchReport:
         if data:
             ctx = build_context(data)
             data_quality[t] = ctx.get("data_caveats", [])
-            analyses = {t: analyze_with_ai(t, data=data)}
+            analyses = {t: analyze_with_ai(t)}
         else:
             from app.models.analysis import AIAnalysis
             analyses = {t: AIAnalysis(ticker=t, summary="Data tidak ditemukan", conclusion="Gagal mengambil data")}
@@ -64,15 +61,13 @@ def run_research(query: str) -> ResearchReport:
     elif intent.type == "comparative":
         tickers = intent.tickers[:2]
         analyses = {}
-        prefetched = {}
         for t in tickers:
             data = fetch_stock(t)
             if data:
-                prefetched[t] = data
                 ctx = build_context(data)
                 data_quality[t] = ctx.get("data_caveats", [])
-                analyses[t] = analyze_with_ai(t, data=data)
-        comparison = compare_with_ai(tickers, prefetched=prefetched)
+                analyses[t] = analyze_with_ai(t)
+        comparison = compare_with_ai(tickers)
 
     elif intent.type == "analyze_only":
         t = intent.tickers[0] if intent.tickers else ""
@@ -81,7 +76,7 @@ def run_research(query: str) -> ResearchReport:
             if data:
                 ctx = build_context(data)
                 data_quality[t] = ctx.get("data_caveats", [])
-                analyses = {t: analyze_with_ai(t, data=data)}
+                analyses = {t: analyze_with_ai(t)}
 
     prompt = _load_prompt("research.md")
     filled = _render_report_prompt(prompt, intent, screening_results, analyses, comparison, data_quality)
