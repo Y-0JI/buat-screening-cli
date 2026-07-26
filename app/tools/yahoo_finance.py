@@ -3,7 +3,7 @@ import time
 import yfinance as yf
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
-from app.tools.base import StockProvider
+
 
 _NOT_FOUND_PATTERNS = [
     "possibly delisted",
@@ -29,7 +29,7 @@ def _classify_error(e: Exception) -> str:
     return "error"
 
 
-class YahooFinanceProvider(StockProvider):
+class YahooFinanceProvider:
     def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
         global _last_rate_limit
         if ticker.upper() in _invalid_tickers:

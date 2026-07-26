@@ -2,8 +2,6 @@ from datetime import date, datetime, timedelta
 import httpx
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
-from app.tools.base import StockProvider
-
 _BROWSER_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
@@ -12,7 +10,7 @@ _BROWSER_HEADERS = {
 }
 
 
-class IDXProvider(StockProvider):
+class IDXProvider:
     def __init__(self):
         self._client: httpx.Client | None = None
 
