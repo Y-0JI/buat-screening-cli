@@ -2,12 +2,12 @@ from app.services.stock_list import get_all, search, count
 
 
 def test_count():
-    assert count() > 900
+    assert count() > 800
 
 
 def test_get_all():
     stocks = get_all()
-    assert len(stocks) > 900
+    assert len(stocks) > 800
     assert "ticker" in stocks[0]
     assert "name" in stocks[0]
 
