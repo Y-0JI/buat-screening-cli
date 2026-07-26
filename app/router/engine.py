@@ -113,30 +113,7 @@ def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
     return provider.fetch(t, period)
 
 
-def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
-    results = []
-    invalid = []
-    failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
-        for f in as_completed(futures):
-            t = futures[f]
-            try:
-                data = f.result()
-                if data and len(data.history) >= 2:
-                    prices = data.history
-                    price = prices[-1].close
-                    prev = prices[-2].close
-                    change = ((price - prev) / prev) * 100 if prev else 0.0
-                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
-                else:
-                    invalid.append(f"{t}: Data tidak cukup")  # ponytail: no data = likely invalid
-            except Exception as e:
-                failed.append(f"{t}: {e}")
-    return sorted(results, key=lambda r: r["change"], reverse=True)[:10], invalid, failed
-
-
-def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
+def _bulk_by_change(tickers: list[str], reverse: bool) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
@@ -156,7 +133,15 @@ def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
                     invalid.append(f"{t}: Data tidak cukup")
             except Exception as e:
                 failed.append(f"{t}: {e}")
-    return sorted(results, key=lambda r: r["change"])[:10], invalid, failed
+    return sorted(results, key=lambda r: r["change"], reverse=reverse)[:10], invalid, failed
+
+
+def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
+    return _bulk_by_change(tickers, reverse=True)
+
+
+def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
+    return _bulk_by_change(tickers, reverse=False)
 
 
 def _calc_change(data: StockData) -> str:

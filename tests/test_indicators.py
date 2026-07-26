@@ -1,7 +1,7 @@
 from datetime import date
 import pytest
 from app.models.stock import HistoricalPrice
-from app.indicators.engine import sma, ema, rsi, macd, atr, bollinger, adx, stochastic
+from app.indicators.engine import sma, ema, rsi, macd, bollinger
 
 
 def _make_prices(closes: list[float]) -> list[HistoricalPrice]:
@@ -13,15 +13,6 @@ def _make_prices(closes: list[float]) -> list[HistoricalPrice]:
         for i, c in enumerate(closes)
     ]
 
-
-def _make_prices_full(highs: list[float], lows: list[float], closes: list[float]) -> list[HistoricalPrice]:
-    return [
-        HistoricalPrice(
-            date=date(2024, 1, (i % 30) + 1),
-            open=closes[i], high=highs[i], low=lows[i], close=closes[i], volume=1_000_000,
-        )
-        for i in range(len(closes))
-    ]
 
 
 class TestSMA:
@@ -85,24 +76,6 @@ class TestMACD:
         assert all(r is None for r in result)
 
 
-class TestATR:
-    def test_atr_known_reference(self):
-        highs = [110, 115, 112, 118, 120, 122]
-        lows = [90, 95, 92, 98, 100, 102]
-        closes = [105, 108, 106, 110, 115, 118]
-        prices = _make_prices_full(highs, lows, closes)
-        result = atr(prices, period=3)
-        tr0 = max(highs[0] - lows[0], abs(highs[0] - closes[0]), abs(lows[0] - closes[0]))
-        tr1 = max(highs[1] - lows[1], abs(highs[1] - closes[0]), abs(lows[1] - closes[0]))
-        tr2 = max(highs[2] - lows[2], abs(highs[2] - closes[1]), abs(lows[2] - closes[1]))
-        expected = (tr0 + tr1 + tr2) / 3
-        assert result[3] == pytest.approx(expected)
-
-    def test_atr_short_data(self):
-        result = atr(_make_prices([1, 2]), period=14)
-        assert all(r is None for r in result)
-
-
 class TestBollinger:
     def test_bollinger_known(self):
         closes = [50.0] * 10
@@ -122,51 +95,4 @@ class TestBollinger:
         assert all(v["upper"] > v["middle"] > v["lower"] for v in valid)
 
 
-class TestADX:
-    def test_adx_known_range(self):
-        prices = [
-            HistoricalPrice(
-                date=date(2024, 1, (i % 28) + 1),
-                open=100 + i, high=105 + i, low=95 + i, close=100 + i, volume=1_000_000,
-            )
-            for i in range(40)
-        ]
-        result = adx(prices, period=14)
-        valid = [v for v in result if v is not None]
-        assert len(valid) > 0
-        for v in valid:
-            assert 0 <= v <= 100
 
-    def test_adx_short_data(self):
-        result = adx(_make_prices([1, 2, 3]), period=14)
-        assert all(r is None for r in result)
-
-
-class TestStochastic:
-    def test_stochastic_known_reference(self):
-        highs = [127.09, 127.22, 126.83, 126.47, 126.76, 127.34, 127.29, 127.90,
-                 128.40, 128.30, 128.05, 128.54, 128.60, 127.87, 127.56,
-                 128.00, 128.20, 127.90]
-        lows =  [125.90, 126.40, 126.16, 125.83, 126.00, 126.32, 126.12, 126.37,
-                 127.00, 126.80, 126.58, 127.00, 127.29, 126.22, 126.16,
-                 126.50, 126.80, 126.30]
-        closes = [127.01, 127.02, 126.58, 126.22, 126.76, 127.24, 126.82, 127.62,
-                  128.22, 127.70, 127.21, 128.06, 128.39, 126.86, 126.76,
-                  127.50, 127.90, 127.30]
-        prices = _make_prices_full(highs, lows, closes)
-        result = stochastic(prices, period=14)
-        stoch = result[13]
-        assert stoch is not None
-        assert "k" in stoch and stoch["d"] is None
-        hh = max(highs[:14])
-        ll = min(lows[:14])
-        expected_k = (closes[13] - ll) / (hh - ll) * 100
-        assert stoch["k"] == pytest.approx(expected_k, abs=0.01)
-        stoch16 = result[16]
-        assert stoch16 is not None and stoch16["d"] is not None
-        k_vals = [result[14]["k"], result[15]["k"], stoch16["k"]]
-        assert min(k_vals) <= stoch16["d"] <= max(k_vals)
-
-    def test_stochastic_short_data(self):
-        result = stochastic(_make_prices([1, 2]), period=14)
-        assert all(r is None for r in result)

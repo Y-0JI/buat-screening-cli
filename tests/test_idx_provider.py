@@ -86,6 +86,4 @@ def test_get_price_no_data(provider):
     assert price is None
 
 
-def test_provider_implements_stock_provider(provider):
-    from app.tools.base import StockProvider
-    assert isinstance(provider, StockProvider)
+

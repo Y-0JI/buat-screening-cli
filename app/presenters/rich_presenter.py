@@ -2,12 +2,12 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
-from app.presenters.base import BasePresenter
+
 
 console = Console()
 
 
-class RichPresenter(BasePresenter):
+class RichPresenter:
     def analysis(self, analysis) -> None:
         header = Text()
         header.append(f"{analysis.ticker}", style="bold cyan")
@@ -29,9 +29,7 @@ class RichPresenter(BasePresenter):
         if analysis.conclusion:
             console.print(Panel(analysis.conclusion, title="[bold green]Kesimpulan[/bold green]", border_style="green"))
         if analysis.screening_results:
-            from app.screeners.engine import ScreeningResult
-            from app.cli.formatter import print_screening_results
-            print_screening_results(analysis.screening_results)
+            self._print_screening_results(analysis.screening_results)
 
     def research_report(self, report) -> None:
         console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
@@ -85,6 +83,17 @@ class RichPresenter(BasePresenter):
         for row in rows:
             table.add_row(*row)
         console.print(table)
+
+    def _print_screening_results(self, results) -> None:
+        if not results:
+            console.print("[yellow]Tidak ada sinyal screening ditemukan.[/yellow]")
+            return
+        cols = [("Sinyal", "bold"), ("Alasan", ""), ("Confidence", "")]
+        rows = []
+        for r in results:
+            style = "green" if r.signal == "BUY" else "red" if r.signal == "SELL" else "yellow"
+            rows.append([f"[{style}]{r.signal}[/{style}]", r.reason, f"{r.confidence:.0%}"])
+        self.table("Hasil Screening", cols, rows)
 
     def stock_header(self, data) -> None:
         text = Text()
