@@ -2,6 +2,7 @@ import re
 import os
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
 from app.models.analysis import AIAnalysis
+from app.models.stock import StockData
 from app.services.llm import chat_completion
 from app.services.stock_list import search
 
@@ -24,8 +25,9 @@ def _render_template(template: str, **kwargs) -> str:
     return template
 
 
-def analyze_with_ai(ticker: str) -> AIAnalysis:
-    data = fetch_stock(ticker)
+def analyze_with_ai(ticker: str, data: StockData | None = None) -> AIAnalysis:
+    if data is None:
+        data = fetch_stock(ticker)
     if not data:
         return AIAnalysis(ticker=ticker.upper(), summary="Data tidak ditemukan", conclusion="Gagal mengambil data")
 
@@ -58,11 +60,13 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     )
 
 
-def compare_with_ai(tickers: list[str]) -> dict:
+def compare_with_ai(tickers: list[str], prefetched: dict[str, StockData] | None = None) -> dict:
     results = []
     failed = []
     for t in tickers:
-        data = fetch_stock(t)
+        data = prefetched.get(t) if prefetched else None
+        if data is None:
+            data = fetch_stock(t)
         if data:
             ctx = build_context(data)
             results.append(ctx)
