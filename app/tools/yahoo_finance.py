@@ -13,10 +13,14 @@ _NOT_FOUND_PATTERNS = [
     "no data available",
     "symbol may be delisted",
 ]
+_RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
 
 
 def _classify_error(e: Exception) -> str:
     msg = str(e).lower()
+    for pat in _RATE_LIMITED_PATTERNS:
+        if pat in msg:
+            return "rate_limited"
     for pat in _NOT_FOUND_PATTERNS:
         if pat in msg:
             return "not_found"
@@ -25,6 +29,7 @@ def _classify_error(e: Exception) -> str:
 
 class YahooFinanceProvider(StockProvider):
     def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
+        time.sleep(random.uniform(0.3, 0.8))
         for attempt in range(3):
             try:
                 stock = yf.Ticker(ticker + ".JK")
@@ -58,7 +63,11 @@ class YahooFinanceProvider(StockProvider):
                     if attempt == 0:
                         logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
                     return None
-                if attempt < 2:
+                if kind == "rate_limited":
+                    delay = random.uniform(10, 30)
+                    logger.warning(f"Rate limited {ticker}, cooling {delay:.0f}s (attempt {attempt+1}/3)")
+                    time.sleep(delay)
+                elif attempt < 2:
                     delay = (1 + attempt) * random.uniform(0.5, 1.5)
                     logger.info(f"Retry {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
                     time.sleep(delay)
