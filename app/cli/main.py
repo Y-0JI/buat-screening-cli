@@ -10,9 +10,17 @@ from app.cli.formatter import console, print_ai_analysis, print_error, print_inf
 from app.cli.formatter import print_research_report, print_stock_header
 from app.cli.formatter import print_screening_results, print_bulk_screening, print_gainer_loser_table
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
+from app.services.validate_universe import run as validate_run, last_validated_days
 from typing import Optional
 
-_KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
+
+def _warn_universe_age():
+    days = last_validated_days()
+    if days is not None and days > 7:
+        console.print(f"[dim]Data universe: {int(days)} hari, jalankan 'screening validate-universe' untuk update[/dim]")
+
+
+_KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers", "validate-universe",
                    "losers", "sector", "stocks", "natural", "info", "chat", "research"}
 
 def _reroute_unknown_to_natural():
@@ -85,6 +93,7 @@ def screen(
     sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
+    _warn_universe_age()
     with console.status(f"[bold blue]Screening saham..."):
         results, invalid, failed = screen_stocks(sector, limit)
     if not results:
@@ -100,6 +109,7 @@ def screen(
 
 @app.command()
 def gainers(limit: int = 10) -> None:
+    _warn_universe_age()
     from app.router.engine import bulk_gainers
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
@@ -110,6 +120,7 @@ def gainers(limit: int = 10) -> None:
 
 @app.command()
 def losers(limit: int = 10) -> None:
+    _warn_universe_age()
     from app.router.engine import bulk_losers
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
@@ -120,6 +131,7 @@ def losers(limit: int = 10) -> None:
 
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
+    _warn_universe_age()
     with console.status(f"[bold blue]Screening saham sektor {name}..."):
         results, invalid, failed = screen_stocks(name)
     if not results:
@@ -194,6 +206,13 @@ def chat() -> None:
 
 
 @app.command()
+def validate_universe(dry_run: bool = typer.Option(False, "--dry-run", help="Hanya laporan, tidak ubah file")) -> None:
+    """Validasi daftar emiten via Yahoo Finance. Update valid flag."""
+    with console.status("[bold blue]Memvalidasi daftar emiten..."):
+        validate_run(dry_run=dry_run)
+
+
+@app.command()
 def info() -> None:
     console.print("[bold]Available commands:[/bold]")
     console.print("  analyze [ticker]     - Analisa saham (AI)")
@@ -208,6 +227,7 @@ def info() -> None:
     console.print("  chat                 - Mode diskusi interaktif")
     console.print('  "[query]"            - Bahasa natural (contoh: "BBCA" atau "analisa BBCA")')
     console.print("  research [query]     - Riset end-to-end (screening+analisis+perbandingan)")
+    console.print("  validate-universe    - Validasi ulang daftar emiten via Yahoo Finance")
     console.print("  info                 - Bantuan ini")
 
 
