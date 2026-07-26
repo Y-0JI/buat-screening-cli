@@ -1,4 +1,5 @@
 import random
+import signal
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
@@ -78,7 +79,7 @@ def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
     time.sleep(random.uniform(0, 0.15))
     data = provider.fetch(t, period="3mo")
     if not data:
-        return None, "error"
+        return None, None
     signals = screen_stock(data)
     if not signals:
         return None, None
@@ -95,17 +96,17 @@ def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
 
 def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
-    invalid = []
     failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        for r, err in ex.map(_fetch_and_screen, tickers):
-            if err == "not_found":
-                invalid.append(err)
-            elif err == "error":
-                failed.append(err)
-            elif r:
-                results.append(r)
-    return sorted(results, key=lambda r: r["max_confidence"], reverse=True), invalid, failed
+    try:
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            for r, err in ex.map(_fetch_and_screen, tickers):
+                if err == "error":
+                    failed.append(err)
+                elif r:
+                    results.append(r)
+    except KeyboardInterrupt:
+        pass
+    return sorted(results, key=lambda r: r["max_confidence"], reverse=True), [], failed
 
 
 def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
@@ -113,50 +114,38 @@ def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
     return provider.fetch(t, period)
 
 
-def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
+def _bulk_change(tickers: list[str], reverse: bool) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
-        for f in as_completed(futures):
-            t = futures[f]
-            try:
-                data = f.result()
-                if data and len(data.history) >= 2:
-                    prices = data.history
-                    price = prices[-1].close
-                    prev = prices[-2].close
-                    change = ((price - prev) / prev) * 100 if prev else 0.0
-                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
-                else:
-                    invalid.append(f"{t}: Data tidak cukup")  # ponytail: no data = likely invalid
-            except Exception as e:
-                failed.append(f"{t}: {e}")
-    return sorted(results, key=lambda r: r["change"], reverse=True)[:10], invalid, failed
+    try:
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
+            for f in as_completed(futures):
+                t = futures[f]
+                try:
+                    data = f.result()
+                    if data and len(data.history) >= 2:
+                        prices = data.history
+                        price = prices[-1].close
+                        prev = prices[-2].close
+                        change = ((price - prev) / prev) * 100 if prev else 0.0
+                        results.append({"ticker": t, "price": price, "change": round(change, 2)})
+                    else:
+                        invalid.append(f"{t}: Data tidak cukup")
+                except Exception as e:
+                    failed.append(f"{t}: {e}")
+    except KeyboardInterrupt:
+        pass
+    return sorted(results, key=lambda r: r["change"], reverse=reverse)[:10], invalid, failed
+
+
+def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
+    return _bulk_change(tickers, reverse=True)
 
 
 def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
-    results = []
-    invalid = []
-    failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
-        for f in as_completed(futures):
-            t = futures[f]
-            try:
-                data = f.result()
-                if data and len(data.history) >= 2:
-                    prices = data.history
-                    price = prices[-1].close
-                    prev = prices[-2].close
-                    change = ((price - prev) / prev) * 100 if prev else 0.0
-                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
-                else:
-                    invalid.append(f"{t}: Data tidak cukup")
-            except Exception as e:
-                failed.append(f"{t}: {e}")
-    return sorted(results, key=lambda r: r["change"])[:10], invalid, failed
+    return _bulk_change(tickers, reverse=False)
 
 
 def _calc_change(data: StockData) -> str:
