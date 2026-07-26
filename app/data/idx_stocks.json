@@ -333,7 +333,7 @@
     "ticker": "ARMY",
     "name": "Armidian Karyatama Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ARNA",
@@ -1059,7 +1059,7 @@
     "ticker": "BTEL",
     "name": "Bakrie Telecom Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BTON",
@@ -1197,7 +1197,7 @@
     "ticker": "CBMF",
     "name": "Cahaya Bintang Medan Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CBPE",
@@ -1353,7 +1353,7 @@
     "ticker": "COWL",
     "name": "Cowell Development Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CPIN",
@@ -1365,7 +1365,7 @@
     "ticker": "CPRI",
     "name": "Capri Nusa Satu Properti Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CPRO",
@@ -1647,7 +1647,7 @@
     "ticker": "DUCK",
     "name": "Jaya Bersama Indo Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "DUTI",
@@ -1749,7 +1749,7 @@
     "ticker": "ENVY",
     "name": "Envy Technologies Indonesia Tb",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ENZO",
@@ -1947,7 +1947,7 @@
     "ticker": "GAMA",
     "name": "Aksara Global Development Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "GDST",
@@ -2043,7 +2043,7 @@
     "ticker": "GOLL",
     "name": "Golden Plantation Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "GOOD",
@@ -2235,7 +2235,7 @@
     "ticker": "HKMU",
     "name": "HK Metals Utama Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "HMSP",
@@ -2253,7 +2253,7 @@
     "ticker": "HOME",
     "name": "Hotel Mandarine Regency Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "HOMI",
@@ -2271,7 +2271,7 @@
     "ticker": "HOTL",
     "name": "Saraswati Griya Lestari Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "HRME",
@@ -2373,7 +2373,7 @@
     "ticker": "IIKP",
     "name": "Inti Agri Resources Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "IKAI",
@@ -2721,7 +2721,7 @@
     "ticker": "JSKY",
     "name": "Sky Energy Indonesia Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "JSMR",
@@ -2787,7 +2787,7 @@
     "ticker": "KBRI",
     "name": "Kertas Basuki Rachmat Indonesi",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "KDSI",
@@ -3033,7 +3033,7 @@
     "ticker": "LCGP",
     "name": "Eureka Prima Jakarta Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "LCKM",
@@ -3081,7 +3081,7 @@
     "ticker": "LMAS",
     "name": "Limas Indonesia Makmur Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "LMAX",
@@ -3183,13 +3183,13 @@
     "ticker": "MABA",
     "name": "Marga Abhinaya Abadi Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MAGP",
     "name": "Multi Agro Gemilang Plantation",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MAHA",
@@ -3657,7 +3657,7 @@
     "ticker": "MTRA",
     "name": "Mitra Pemuda Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MTSM",
@@ -3849,7 +3849,7 @@
     "ticker": "NUSA",
     "name": "Sinergi Megah Internusa Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "NZIA",
@@ -3879,7 +3879,7 @@
     "ticker": "OCAP",
     "name": "Onix Capital Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "OILS",
@@ -4089,7 +4089,7 @@
     "ticker": "PLAS",
     "name": "Polaris Investama Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PLIN",
@@ -4179,7 +4179,7 @@
     "ticker": "POOL",
     "name": "Pool Advista Indonesia Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PORT",
@@ -4191,7 +4191,7 @@
     "ticker": "POSA",
     "name": "Bliss Properti Indonesia Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "POWR",
@@ -4359,7 +4359,7 @@
     "ticker": "PURE",
     "name": "Trinitan Metals and Minerals T",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PURI",
@@ -4479,7 +4479,7 @@
     "ticker": "RIMO",
     "name": "Rimo International Lestari Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "RISE",
@@ -4617,7 +4617,7 @@
     "ticker": "SCPI",
     "name": "Organon Pharma Indonesia Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SDMU",
@@ -4695,7 +4695,7 @@
     "ticker": "SIMA",
     "name": "Siwani Makmur Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SIMP",
@@ -4737,7 +4737,7 @@
     "ticker": "SKYB",
     "name": "Northcliff Citranusa Indonesia",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SLIS",
@@ -4833,7 +4833,7 @@
     "ticker": "SMRU",
     "name": "SMR Utama Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SMSM",
@@ -4929,7 +4929,7 @@
     "ticker": "SRIL",
     "name": "Sri Rejeki Isman Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SRSN",
@@ -4989,7 +4989,7 @@
     "ticker": "SUGI",
     "name": "Sugih Energy Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SULI",
@@ -5109,7 +5109,7 @@
     "ticker": "TDPM",
     "name": "Tianrong Chemicals Industry Tb",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TEBE",
@@ -5121,7 +5121,7 @@
     "ticker": "TECH",
     "name": "Indosterling Technomedia Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TELE",
@@ -5283,7 +5283,7 @@
     "ticker": "TRAM",
     "name": "Trada Alam Minera Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TRGU",
@@ -5295,7 +5295,7 @@
     "ticker": "TRIL",
     "name": "Triwira Insanlestari Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TRIM",
@@ -5313,7 +5313,7 @@
     "ticker": "TRIO",
     "name": "Trikomsel Oke Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TRIS",
@@ -5421,7 +5421,7 @@
     "ticker": "UNIT",
     "name": "Nusantara Inti Corpora Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "UNSP",
@@ -5643,7 +5643,7 @@
     "ticker": "WSKT",
     "name": "Waskita Karya (Persero) Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "WTON",
