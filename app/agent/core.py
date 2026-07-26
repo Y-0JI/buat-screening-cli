@@ -133,6 +133,7 @@ def ask_llm(user_query: str, context: str = "", messages: list[dict] | None = No
 
 
 def _run_tool(name: str, args: list[str]) -> str | None:
+    from app.services.stock_list import get_all
     if name == "analyze":
         ticker = args[0].upper() if args else ""
         if not ticker:
@@ -172,67 +173,34 @@ def _run_tool(name: str, args: list[str]) -> str | None:
         return "\n\n".join(parts)
 
     if name == "screen":
-        from app.services.stock_list import get_all
-        tickers = [s["ticker"] for s in get_all()]
-        results, invalid, failed = bulk_screen(tickers)
+        all_tickers = [s["ticker"] for s in get_all()]
+        results, _invalid, _failed = bulk_screen(all_tickers)
         sector_filter = args[0] if args else None
         if sector_filter:
             results = [r for r in results if r.get("sector") and sector_filter.lower() in r["sector"].lower()]
         if not results:
-            parts = ["Tidak ada sinyal screening ditemukan."]
-            if invalid:
-                parts.append(f"{len(invalid)} ticker tidak ditemukan")
-            if failed:
-                parts.append(f"{len(failed)} saham gagal diproses")
-            return " ".join(parts)
+            return "Tidak ada sinyal screening ditemukan."
         lines = ["Hasil screening:"]
         for r in results[:10]:
             ts = r["top_signal"]
             lines.append(f"- {r['ticker']} ({r.get('sector', '-')}): {ts.signal} ({ts.confidence:.0%}) - {ts.reason}")
-        if invalid:
-            lines.append(f"{len(invalid)} ticker tidak ditemukan")
-        if failed:
-            lines.append(f"⚠ {len(failed)} saham gagal diproses")
         return "\n".join(lines)
 
-    if name == "gainers":
-        from app.services.stock_list import get_all
-        tickers = [s["ticker"] for s in get_all()]
-        results, invalid, failed = bulk_gainers(tickers)
+    if name in ("gainers", "losers"):
+        all_tickers = [s["ticker"] for s in get_all()]
+        fn = bulk_gainers if name == "gainers" else bulk_losers
+        results, invalid, failed = fn(all_tickers)
+        label = "gainers" if name == "gainers" else "losers"
         if not results:
-            parts = ["Tidak ada data gainers."]
+            msg = f"Tidak ada data {label}."
             if invalid:
-                parts.append(f"{len(invalid)} ticker tidak ditemukan")
+                msg += f" {len(invalid)} ticker tidak ditemukan"
             if failed:
-                parts.append(f"{len(failed)} saham gagal diproses")
-            return " ".join(parts)
-        lines = ["Top gainers:"]
+                msg += f" {len(failed)} saham gagal diproses"
+            return msg
+        lines = [f"Top {label}:"]
         for r in results[:10]:
             lines.append(f"- {r['ticker']}: {r['price']:,.0f} ({r['change']:+.2f}%)")
-        if invalid:
-            lines.append(f"{len(invalid)} ticker tidak ditemukan")
-        if failed:
-            lines.append(f"⚠ {len(failed)} saham gagal diproses")
-        return "\n".join(lines)
-
-    if name == "losers":
-        from app.services.stock_list import get_all
-        tickers = [s["ticker"] for s in get_all()]
-        results, invalid, failed = bulk_losers(tickers)
-        if not results:
-            parts = ["Tidak ada data losers."]
-            if invalid:
-                parts.append(f"{len(invalid)} ticker tidak ditemukan")
-            if failed:
-                parts.append(f"{len(failed)} saham gagal diproses")
-            return " ".join(parts)
-        lines = ["Top losers:"]
-        for r in results[:10]:
-            lines.append(f"- {r['ticker']}: {r['price']:,.0f} ({r['change']:+.2f}%)")
-        if invalid:
-            lines.append(f"{len(invalid)} ticker tidak ditemukan")
-        if failed:
-            lines.append(f"⚠ {len(failed)} saham gagal diproses")
         return "\n".join(lines)
 
     if name == "search":
