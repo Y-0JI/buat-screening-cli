@@ -86,12 +86,16 @@ def screen(
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
     with console.status(f"[bold blue]Screening saham..."):
-        results = screen_stocks(sector, limit)
+        results, invalid, failed = screen_stocks(sector, limit)
     if not results:
         print_info("Tidak ada sinyal screening ditemukan")
+        if invalid:
+            console.print(f"[dim]{len(invalid)} ticker tidak ditemukan[/dim]")
+        if failed:
+            console.print(f"[yellow]⚠ {len(failed)} saham gagal diproses[/yellow]")
         return
     title = f"Hasil Screening{' — ' + sector if sector else ''}"
-    print_bulk_screening(results, title=title)
+    print_bulk_screening(results, title=title, invalid=invalid, failed=failed)
 
 
 @app.command()
@@ -100,8 +104,8 @@ def gainers(limit: int = 10) -> None:
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
-        results = bulk_gainers(tickers)
-    print_gainer_loser_table(results[:limit], title="Top Gainers")
+        results, invalid, failed = bulk_gainers(tickers)
+    print_gainer_loser_table(results[:limit], title="Top Gainers", invalid=invalid, failed=failed)
 
 
 @app.command()
@@ -110,18 +114,22 @@ def losers(limit: int = 10) -> None:
     from app.services.stock_list import get_all
     tickers = [s["ticker"] for s in get_all()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
-        results = bulk_losers(tickers)
-    print_gainer_loser_table(results[:limit], title="Top Losers")
+        results, invalid, failed = bulk_losers(tickers)
+    print_gainer_loser_table(results[:limit], title="Top Losers", invalid=invalid, failed=failed)
 
 
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
-    with console.status(f"[bold blue]Screening {len(name)} saham sektor {name}..."):
-        results = screen_stocks(name)
+    with console.status(f"[bold blue]Screening saham sektor {name}..."):
+        results, invalid, failed = screen_stocks(name)
     if not results:
         print_info(f"Tidak ada sinyal screening di sektor {name}")
+        if invalid:
+            console.print(f"[dim]{len(invalid)} ticker tidak ditemukan[/dim]")
+        if failed:
+            console.print(f"[yellow]⚠ {len(failed)} saham gagal diproses[/yellow]")
         return
-    print_bulk_screening(results, title=f"Hasil Screening — {name}")
+    print_bulk_screening(results, title=f"Hasil Screening — {name}", invalid=invalid, failed=failed)
 
 
 @app.command()

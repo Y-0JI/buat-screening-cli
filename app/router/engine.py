@@ -1,3 +1,5 @@
+import random
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from app.tools import get_provider
@@ -72,13 +74,17 @@ def build_context(data: StockData) -> dict:
     }
 
 
-def _fetch_and_screen(t: str) -> dict | None:
+def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
+    time.sleep(random.uniform(0, 0.15))
     data = provider.fetch(t, period="3mo")
     if not data:
-        return None
+        price = provider.get_price(t)
+        if price is None:
+            return None, "not_found"
+        return None, "error"
     signals = screen_stock(data)
     if not signals:
-        return None
+        return None, None
     return {
         "ticker": t,
         "name": data.info.name,
@@ -87,48 +93,73 @@ def _fetch_and_screen(t: str) -> dict | None:
         "signals": signals,
         "max_confidence": max(s.confidence for s in signals),
         "top_signal": max(signals, key=lambda s: s.confidence),
-    }
+    }, None
 
 
-def bulk_screen(tickers: list[str]) -> list[dict]:
+def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
+    invalid = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        for r in ex.map(_fetch_and_screen, tickers):
-            if r:
+        for r, err in ex.map(_fetch_and_screen, tickers):
+            if err == "not_found":
+                invalid.append(err)
+            elif err == "error":
+                failed.append(err)
+            elif r:
                 results.append(r)
-    return sorted(results, key=lambda r: r["max_confidence"], reverse=True)
+    return sorted(results, key=lambda r: r["max_confidence"], reverse=True), invalid, failed
 
 
-def bulk_gainers(tickers: list[str]) -> list[dict]:
+def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
+    time.sleep(random.uniform(0, 0.15))
+    return provider.fetch(t, period)
+
+
+def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
+    invalid = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
-            data = f.result()
-            if data and len(data.history) >= 2:
-                prices = data.history
-                price = prices[-1].close
-                prev = prices[-2].close
-                change = ((price - prev) / prev) * 100 if prev else 0.0
-                results.append({"ticker": t, "price": price, "change": round(change, 2)})
-    return sorted(results, key=lambda r: r["change"], reverse=True)[:10]
+            try:
+                data = f.result()
+                if data and len(data.history) >= 2:
+                    prices = data.history
+                    price = prices[-1].close
+                    prev = prices[-2].close
+                    change = ((price - prev) / prev) * 100 if prev else 0.0
+                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
+                else:
+                    invalid.append(f"{t}: Data tidak cukup")  # ponytail: no data = likely invalid
+            except Exception as e:
+                failed.append(f"{t}: {e}")
+    return sorted(results, key=lambda r: r["change"], reverse=True)[:10], invalid, failed
 
 
-def bulk_losers(tickers: list[str]) -> list[dict]:
+def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
+    invalid = []
+    failed = []
     with ThreadPoolExecutor(max_workers=10) as ex:
-        futures = {ex.submit(provider.fetch, t, "5d"): t for t in tickers}
+        futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
-            data = f.result()
-            if data and len(data.history) >= 2:
-                prices = data.history
-                price = prices[-1].close
-                prev = prices[-2].close
-                change = ((price - prev) / prev) * 100 if prev else 0.0
-                results.append({"ticker": t, "price": price, "change": round(change, 2)})
-    return sorted(results, key=lambda r: r["change"])[:10]
+            try:
+                data = f.result()
+                if data and len(data.history) >= 2:
+                    prices = data.history
+                    price = prices[-1].close
+                    prev = prices[-2].close
+                    change = ((price - prev) / prev) * 100 if prev else 0.0
+                    results.append({"ticker": t, "price": price, "change": round(change, 2)})
+                else:
+                    invalid.append(f"{t}: Data tidak cukup")
+            except Exception as e:
+                failed.append(f"{t}: {e}")
+    return sorted(results, key=lambda r: r["change"])[:10], invalid, failed
 
 
 def _calc_change(data: StockData) -> str:

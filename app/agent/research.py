@@ -29,7 +29,7 @@ def run_research(query: str) -> ResearchReport:
 
     if intent.type == "sector_theme":
         all_tickers = [s["ticker"] for s in get_all()]
-        results = bulk_screen(all_tickers)
+        results, _invalid, _failed = bulk_screen(all_tickers)
         if intent.sector:
             results = [r for r in results if r.get("sector") and intent.sector.lower() in r["sector"].lower()]
         top = [r for r in results if r.get("max_confidence", 0) >= 0.7][:5]

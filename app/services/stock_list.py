@@ -10,13 +10,20 @@ def _load() -> list[dict]:
 
 
 def get_all() -> list[dict]:
-    return _load()
+    stocks = _load()
+    if stocks and "valid" in stocks[0]:
+        return [s for s in stocks if s.get("valid", True)]
+    return stocks
 
 
 def search(query: str) -> list[dict]:
     q = query.lower()
-    return [s for s in _load() if q in s["ticker"].lower() or q in s["name"].lower()]
+    stocks = _load()
+    results = [s for s in stocks if q in s["ticker"].lower() or q in s["name"].lower()]
+    if results and "valid" in results[0]:
+        return [s for s in results if s.get("valid", True)]
+    return results
 
 
 def count() -> int:
-    return len(_load())
+    return len(get_all())
