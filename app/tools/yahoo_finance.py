@@ -14,6 +14,7 @@ _NOT_FOUND_PATTERNS = [
     "symbol may be delisted",
 ]
 _RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
+_last_rate_limit: float = 0.0  # ponytail: global cooldown for all workers
 
 _last_rate_limit: float = 0.0  # ponytail: global cooldown, per-endpoint if multiple providers
 

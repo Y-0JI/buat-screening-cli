@@ -97,7 +97,7 @@ def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         for r, err in ex.map(_fetch_and_screen, tickers):
             if err == "not_found":
                 invalid.append(err)
@@ -117,7 +117,7 @@ def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
@@ -140,7 +140,7 @@ def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     results = []
     invalid = []
     failed = []
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=2) as ex:
         futures = {ex.submit(_fetch_with_stagger, t, "5d"): t for t in tickers}
         for f in as_completed(futures):
             t = futures[f]
