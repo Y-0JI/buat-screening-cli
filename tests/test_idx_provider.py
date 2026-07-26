@@ -91,6 +91,17 @@ def test_provider_implements_stock_provider(provider):
     assert isinstance(provider, StockProvider)
 
 
+def _mock_json_response(data, status=200, content_type="application/json", headers=None):
+    resp = MagicMock()
+    resp.status_code = status
+    resp.headers = headers or {"content-type": content_type}
+    resp.json.return_value = data
+    resp.text = "<html>blocked</html>" if status != 200 else "{}"
+    resp.history = []
+    resp.url = "http://test.url"
+    return resp
+
+
 def test_fetch_universe_success(provider):
     mock_data = [
         {"KodeEmiten": "BBCA", "NamaEmiten": "Bank Central Asia Tbk", "Sektor": "Financials"},
@@ -98,7 +109,7 @@ def test_fetch_universe_success(provider):
         {"KodeEmiten": "TLKM", "NamaEmiten": "Telkom Indonesia Tbk", "Sektor": "Communication Services"},
     ]
     client = MagicMock()
-    client.get.return_value.json.return_value = mock_data
+    client.get.return_value = _mock_json_response(mock_data)
     with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
         result = provider.fetch_universe()
 
@@ -113,7 +124,7 @@ def test_fetch_universe_wraps_in_list(provider):
         {"KodeEmiten": "BBCA", "NamaEmiten": "Bank Central Asia Tbk", "Sektor": "Financials"},
     ]}
     client = MagicMock()
-    client.get.return_value.json.return_value = mock_data
+    client.get.return_value = _mock_json_response(mock_data)
     with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
         result = provider.fetch_universe()
 
@@ -123,7 +134,7 @@ def test_fetch_universe_wraps_in_list(provider):
 
 def test_fetch_universe_empty_response(provider):
     client = MagicMock()
-    client.get.return_value.json.return_value = {}
+    client.get.return_value = _mock_json_response({})
     with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
         result = provider.fetch_universe()
     assert result == []
@@ -134,7 +145,7 @@ def test_fetch_universe_no_ticker_skipped(provider):
         {"NamaEmiten": "No Ticker Here", "Sektor": "Finance"},
     ]
     client = MagicMock()
-    client.get.return_value.json.return_value = mock_data
+    client.get.return_value = _mock_json_response(mock_data)
     with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
         result = provider.fetch_universe()
     assert result == []
@@ -143,6 +154,17 @@ def test_fetch_universe_no_ticker_skipped(provider):
 def test_fetch_universe_handles_http_error(provider):
     client = MagicMock()
     client.get.side_effect = Exception("HTTP 500")
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+    assert result == []
+
+
+def test_fetch_universe_non_json_response(provider):
+    resp = _mock_json_response({}, status=403, content_type="text/html")
+    resp.text = "<html>Access Denied</html>"
+    resp.headers = {"content-type": "text/html", "server": "cloudflare"}
+    client = MagicMock()
+    client.get.return_value = resp
     with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
         result = provider.fetch_universe()
     assert result == []

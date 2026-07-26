@@ -4,8 +4,9 @@ from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.tools.base import StockProvider
 
-# Endpoint untuk daftar emiten — perlu diverifikasi dari jaringan Indonesia.
-# IDX mungkin menggunakan endpoint berbeda. URL ini dapat disesuaikan.
+# Endpoint untuk daftar emiten — belum diverifikasi.
+# Setelah diagnostics dari fetch_universe() mengonfirmasi endpoint yang benar,
+# URL ini dapat disesuaikan.
 _UNIVERSE_ENDPOINT = "https://www.idx.co.id/primary/ListedCompany/GetListedCompany"
 
 _BROWSER_HEADERS = {
@@ -87,12 +88,27 @@ class IDXProvider(StockProvider):
     def fetch_universe(self) -> list[dict]:
         self._ensure_session()
         try:
-            raw = self._client.get(
+            resp = self._client.get(
                 _UNIVERSE_ENDPOINT,
                 params={"start": 0, "length": 2000},
-            ).json()
+            )
+
+            ct = resp.headers.get("content-type", "")
+            if resp.status_code != 200 or "json" not in ct.lower():
+                hops = len(resp.history)
+                logger.warning(
+                    "IDX universe: HTTP {} Content-Type: {} Server: {} Redirects: {} hops | "
+                    "URL: {} | Body preview: {}",
+                    resp.status_code, ct, resp.headers.get("server", "?"),
+                    hops, resp.url, resp.text[:200],
+                )
+                for i, r in enumerate(resp.history):
+                    logger.debug("  redirect {}: {} -> {} Location: {}", i+1, r.url, r.status_code, r.headers.get("location", ""))
+                return []
+
+            raw = resp.json()
             if not raw:
-                logger.warning("Response kosong dari IDX universe endpoint")
+                logger.warning("IDX universe: response body kosong")
                 return []
             companies = raw if isinstance(raw, list) else raw.get("replies") or raw.get("data") or []
             result = []
@@ -111,7 +127,7 @@ class IDXProvider(StockProvider):
                     "valid": valid,
                 })
             if not result:
-                logger.warning("Gagal parse daftar emiten dari response IDX")
+                logger.warning("IDX universe: data parsed 0 companies dari {} entries", len(companies))
             return result
         except Exception as e:
             logger.warning(f"Gagal fetch universe dari IDX: {e}")
