@@ -14,6 +14,7 @@ _NOT_FOUND_PATTERNS = [
     "symbol may be delisted",
 ]
 _RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
+_last_rate_limit: float = 0.0  # ponytail: global cooldown for all workers
 
 
 def _classify_error(e: Exception) -> str:
@@ -29,6 +30,10 @@ def _classify_error(e: Exception) -> str:
 
 class YahooFinanceProvider(StockProvider):
     def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
+        global _last_rate_limit
+        cooldown = time.time() - _last_rate_limit
+        if cooldown < 15:
+            time.sleep(15 - cooldown)
         time.sleep(random.uniform(0.3, 0.8))
         for attempt in range(3):
             try:
@@ -64,6 +69,7 @@ class YahooFinanceProvider(StockProvider):
                         logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
                     return None
                 if kind == "rate_limited":
+                    _last_rate_limit = time.time()
                     delay = random.uniform(10, 30)
                     logger.warning(f"Rate limited {ticker}, cooling {delay:.0f}s (attempt {attempt+1}/3)")
                     time.sleep(delay)
