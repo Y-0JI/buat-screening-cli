@@ -15,6 +15,10 @@ _NOT_FOUND_PATTERNS = [
 ]
 _RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
 
+# Session cache: ticker yang sudah dikonfirmasi tidak valid.
+# Menghindari HTTP request berulang untuk ticker delisted/tidak aktif.
+_invalid_tickers: set[str] = set()
+
 
 def _classify_error(e: Exception) -> str:
     msg = str(e).lower()
@@ -29,6 +33,8 @@ def _classify_error(e: Exception) -> str:
 
 class YahooFinanceProvider(StockProvider):
     def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
+        if ticker.upper() in _invalid_tickers:
+            return None
         time.sleep(random.uniform(0.3, 0.8))
         for attempt in range(3):
             try:
@@ -36,7 +42,7 @@ class YahooFinanceProvider(StockProvider):
                 info = stock.info
                 hist = stock.history(period=period)
                 if hist.empty:
-                    logger.info(f"Data kosong untuk {ticker}")
+                    logger.debug(f"Data kosong untuk {ticker}")
                     return None
                 stock_info = StockInfo(
                     ticker=ticker.upper(),
@@ -60,6 +66,7 @@ class YahooFinanceProvider(StockProvider):
             except Exception as e:
                 kind = _classify_error(e)
                 if kind == "not_found":
+                    _invalid_tickers.add(ticker.upper())
                     if attempt == 0:
                         logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
                     return None
@@ -69,13 +76,15 @@ class YahooFinanceProvider(StockProvider):
                     time.sleep(delay)
                 elif attempt < 2:
                     delay = (1 + attempt) * random.uniform(0.5, 1.5)
-                    logger.info(f"Retry {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
+                    logger.debug(f"Retry {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
                     time.sleep(delay)
                 else:
                     logger.warning(f"Gagal fetch {ticker} setelah 3 percobaan: {e}")
                     return None
 
     def get_price(self, ticker: str) -> float | None:
+        if ticker.upper() in _invalid_tickers:
+            return None
         data = self.fetch(ticker, period="5d")
         if data and data.history:
             return data.history[-1].close
