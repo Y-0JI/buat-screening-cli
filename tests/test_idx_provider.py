@@ -89,3 +89,60 @@ def test_get_price_no_data(provider):
 def test_provider_implements_stock_provider(provider):
     from app.tools.base import StockProvider
     assert isinstance(provider, StockProvider)
+
+
+def test_fetch_universe_success(provider):
+    mock_data = [
+        {"KodeEmiten": "BBCA", "NamaEmiten": "Bank Central Asia Tbk", "Sektor": "Financials"},
+        {"KodeEmiten": "BBRI", "NamaEmiten": "Bank Rakyat Indonesia Tbk", "Sektor": "Financials"},
+        {"KodeEmiten": "TLKM", "NamaEmiten": "Telkom Indonesia Tbk", "Sektor": "Communication Services"},
+    ]
+    client = MagicMock()
+    client.get.return_value.json.return_value = mock_data
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+
+    assert len(result) == 3
+    assert result[0] == {"ticker": "BBCA", "name": "Bank Central Asia Tbk", "sector": "Financials", "valid": True}
+    assert result[1]["ticker"] == "BBRI"
+    assert result[2]["ticker"] == "TLKM"
+
+
+def test_fetch_universe_wraps_in_list(provider):
+    mock_data = {"replies": [
+        {"KodeEmiten": "BBCA", "NamaEmiten": "Bank Central Asia Tbk", "Sektor": "Financials"},
+    ]}
+    client = MagicMock()
+    client.get.return_value.json.return_value = mock_data
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+
+    assert len(result) == 1
+    assert result[0]["ticker"] == "BBCA"
+
+
+def test_fetch_universe_empty_response(provider):
+    client = MagicMock()
+    client.get.return_value.json.return_value = {}
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+    assert result == []
+
+
+def test_fetch_universe_no_ticker_skipped(provider):
+    mock_data = [
+        {"NamaEmiten": "No Ticker Here", "Sektor": "Finance"},
+    ]
+    client = MagicMock()
+    client.get.return_value.json.return_value = mock_data
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+    assert result == []
+
+
+def test_fetch_universe_handles_http_error(provider):
+    client = MagicMock()
+    client.get.side_effect = Exception("HTTP 500")
+    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+        result = provider.fetch_universe()
+    assert result == []

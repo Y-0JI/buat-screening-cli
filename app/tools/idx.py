@@ -4,6 +4,10 @@ from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.tools.base import StockProvider
 
+# Endpoint untuk daftar emiten — perlu diverifikasi dari jaringan Indonesia.
+# IDX mungkin menggunakan endpoint berbeda. URL ini dapat disesuaikan.
+_UNIVERSE_ENDPOINT = "https://www.idx.co.id/primary/ListedCompany/GetListedCompany"
+
 _BROWSER_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
@@ -79,6 +83,39 @@ class IDXProvider(StockProvider):
         except Exception as e:
             logger.warning(f"Gagal get_price IDX {ticker}: {e}")
         return None
+
+    def fetch_universe(self) -> list[dict]:
+        self._ensure_session()
+        try:
+            raw = self._client.get(
+                _UNIVERSE_ENDPOINT,
+                params={"start": 0, "length": 2000},
+            ).json()
+            if not raw:
+                logger.warning("Response kosong dari IDX universe endpoint")
+                return []
+            companies = raw if isinstance(raw, list) else raw.get("replies") or raw.get("data") or []
+            result = []
+            for c in companies:
+                ticker = c.get("KodeEmiten") or c.get("kode") or c.get("ticker") or c.get("code")
+                if not ticker:
+                    continue
+                name = c.get("NamaEmiten") or c.get("nama") or c.get("name") or ""
+                sector = c.get("Sektor") or c.get("sektor") or c.get("sector")
+                status = c.get("Status") or c.get("status")
+                valid = status is None or str(status).lower() not in ("delisted", "suspended", "tidak_aktif")
+                result.append({
+                    "ticker": str(ticker).upper().strip(),
+                    "name": str(name).strip(),
+                    "sector": str(sector).strip() if sector else None,
+                    "valid": valid,
+                })
+            if not result:
+                logger.warning("Gagal parse daftar emiten dari response IDX")
+            return result
+        except Exception as e:
+            logger.warning(f"Gagal fetch universe dari IDX: {e}")
+            return []
 
     def _fetch_meta(self, ticker: str) -> dict:
         try:
