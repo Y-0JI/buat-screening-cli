@@ -31,7 +31,7 @@ def test_fetch_stock_none():
 
 def test_bulk_losers():
     with patch("app.router.engine.provider") as mock_provider:
-        mock_provider.fetch.side_effect = lambda t, period="5d": {
+        mock_provider.fetch.side_effect = lambda t, *a, **kw: {
             "BBCA": _mock_stock(price=100.0, prev=110.0),
             "BBRI": _mock_stock(price=50.0, prev=60.0),
         }.get(t)
@@ -46,7 +46,7 @@ def test_bulk_losers():
 
 def test_bulk_gainers():
     with patch("app.router.engine.provider") as mock_provider:
-        mock_provider.fetch.side_effect = lambda t, period="5d": {
+        mock_provider.fetch.side_effect = lambda t, *a, **kw: {
             "BBCA": _mock_stock(price=100.0, prev=110.0),
             "BBRI": _mock_stock(price=50.0, prev=40.0),
         }.get(t)
