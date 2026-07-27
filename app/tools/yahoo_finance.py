@@ -50,7 +50,7 @@ class YahooFinanceProvider:
                         currency=info.get("currency", "IDR"),
                     )
                 else:
-                    stock_info = StockInfo(ticker=ticker.upper())
+                    stock_info = StockInfo(ticker=ticker.upper(), name=ticker.upper())
                 hist = stock.history(period=period)
                 if hist.empty:
                     logger.debug(f"Data kosong untuk {ticker}")
