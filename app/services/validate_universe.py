@@ -15,8 +15,7 @@ _BATCH_SIZE = 50
 
 
 def _check(ticker: str) -> tuple[str, str]:
-    global _last_rate_limit
-    cooldown = time.time() - _last_rate_limit
+    cooldown = time.time() - _last_rate_limit[0]
     if cooldown < 15:
         time.sleep(15 - cooldown)
     try:
@@ -28,7 +27,7 @@ def _check(ticker: str) -> tuple[str, str]:
         msg = str(e).lower()
         for pat in _RATE_LIMITED_PATTERNS:
             if pat in msg:
-                _last_rate_limit = time.time()
+                _last_rate_limit[0] = time.time()
                 return ticker, "rate_limited"
         if "delisted" in msg or "no price data found" in msg:
             return ticker, "not_found"
@@ -67,7 +66,7 @@ def run(dry_run: bool = False) -> None:
     print(f"Memvalidasi {total} ticker...", file=sys.stderr)
 
     try:
-        with ThreadPoolExecutor(max_workers=10) as ex:
+        with ThreadPoolExecutor(max_workers=2) as ex:
             futures = {ex.submit(_check, t): t for t in tickers}
             for f in as_completed(futures):
                 ticker, status = f.result()
