@@ -1,4 +1,3 @@
-import time
 from loguru import logger
 from app.tools.yahoo_finance import YahooFinanceProvider
 from app.tools.idx import IDXProvider
@@ -33,7 +32,7 @@ class FallbackProvider:
                 logger.warning(f"{name}: no data for {ticker}")
             except Exception as e:
                 logger.warning(f"{name}: failed for {ticker}: {e}")
-        cached = self.cache.load_stale(ticker, period, need_profile)
+        cached = self.cache.load(ticker, period, need_profile, allow_stale=True)
         if cached:
             logger.warning(f"All providers failed for {ticker}, returning stale cache")
             return cached

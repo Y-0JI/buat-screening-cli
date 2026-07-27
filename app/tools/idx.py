@@ -65,7 +65,7 @@ class IDXProvider:
             except Exception as e:
                 if attempt < 2:
                     logger.debug(f"Retry IDX {ticker} in {attempt+1}s (attempt {attempt+1}/3): {e}")
-                    __import__("time").sleep(attempt + 1)
+                    time.sleep(attempt + 1)
                 else:
                     logger.warning(f"Gagal fetch IDX {ticker} setelah 3 percobaan: {e}")
         return None

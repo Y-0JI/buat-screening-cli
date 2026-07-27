@@ -49,12 +49,12 @@ def test_fallback_all_fail_cached():
     p2 = MagicMock()
     p2.fetch.return_value = None
     cache = MagicMock()
-    cache.load_stale.return_value = _mock_data("CACHED")
+    cache.load.return_value = _mock_data("CACHED")
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("CACHED")
     assert result is not None
     assert result.info.ticker == "CACHED"
-    cache.load_stale.assert_called_once()
+    cache.load.assert_called_once()
 
 
 def test_fallback_all_fail_no_cache():
@@ -63,7 +63,7 @@ def test_fallback_all_fail_no_cache():
     p2 = MagicMock()
     p2.fetch.return_value = None
     cache = MagicMock()
-    cache.load_stale.return_value = None
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("GAGAL")
     assert result is None

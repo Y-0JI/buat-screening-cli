@@ -53,5 +53,5 @@ def test_cache_stale():
     d = _empty_cache_dir()
     c = ProviderCache(cache_dir=d, ttl_hours=0)
     c.save("BBCA", "6mo", True, _mock_data())
-    loaded = c.load_stale("BBCA", "6mo", True)
+    loaded = c.load("BBCA", "6mo", True, allow_stale=True)
     assert loaded is not None

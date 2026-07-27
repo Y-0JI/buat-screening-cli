@@ -1,5 +1,3 @@
-import hashlib
-import json
 import os
 import time
 from pathlib import Path
@@ -15,48 +13,35 @@ class ProviderCache:
         self.ttl_seconds = ttl_hours * 3600
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
-    def _key(self, ticker: str, period: str, need_profile: bool) -> str:
-        raw = f"{ticker.upper()}:{period}:{need_profile}"
-        return hashlib.md5(raw.encode()).hexdigest()[:16]
-
-    def _path(self, key: str) -> Path:
-        return self.cache_dir / f"{key}.json"
+    def _path(self, ticker: str, period: str, need_profile: bool) -> Path:
+        safe = f"{ticker.upper()}_{period}_{need_profile}"
+        return self.cache_dir / f"{safe}.json"
 
     def save(self, ticker: str, period: str, need_profile: bool, data: StockData) -> None:
-        key = self._key(ticker, period, need_profile)
-        path = self._path(key)
+        path = self._path(ticker, period, need_profile)
         try:
             path.write_text(data.model_dump_json())
-            logger.debug(f"Cache SAVED: {key} ({ticker})")
+            logger.debug(f"Cache SAVED: {ticker} ({period})")
         except Exception as e:
-            logger.warning(f"Cache SAVE failed: {key}: {e}")
+            logger.warning(f"Cache SAVE failed: {ticker}: {e}")
 
-    def load(self, ticker: str, period: str, need_profile: bool) -> StockData | None:
-        key = self._key(ticker, period, need_profile)
-        path = self._path(key)
+    def load(self, ticker: str, period: str, need_profile: bool, allow_stale: bool = False) -> StockData | None:
+        path = self._path(ticker, period, need_profile)
         if not path.exists():
-            logger.debug(f"Cache MISS: {key}")
+            logger.debug(f"Cache MISS: {ticker}")
             return None
-        age = time.time() - os.path.getmtime(path)
-        if age > self.ttl_seconds:
-            logger.debug(f"Cache EXPIRED: {key}, age={age/3600:.1f}h")
-            return None
+        if not allow_stale:
+            age = time.time() - os.path.getmtime(path)
+            if age > self.ttl_seconds:
+                logger.debug(f"Cache EXPIRED: {ticker}, age={age/3600:.1f}h")
+                return None
         try:
             data = StockData.model_validate_json(path.read_text())
-            logger.debug(f"Cache HIT: {key} ({ticker})")
+            if allow_stale:
+                logger.warning(f"Cache STALE: {ticker}")
+            else:
+                logger.debug(f"Cache HIT: {ticker}")
             return data
         except Exception as e:
-            logger.warning(f"Cache LOAD failed: {key}: {e}")
-            return None
-
-    def load_stale(self, ticker: str, period: str, need_profile: bool) -> StockData | None:
-        key = self._key(ticker, period, need_profile)
-        path = self._path(key)
-        if not path.exists():
-            return None
-        try:
-            data = StockData.model_validate_json(path.read_text())
-            logger.warning(f"Cache STALE: {key} ({ticker})")
-            return data
-        except Exception:
+            logger.warning(f"Cache LOAD failed: {ticker}: {e}")
             return None
