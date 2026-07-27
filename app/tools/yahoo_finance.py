@@ -3,6 +3,7 @@ import time
 import yfinance as yf
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
+from app.models.symbol import SymbolInfo
 
 
 _NOT_FOUND_PATTERNS = [
@@ -95,6 +96,9 @@ class YahooFinanceProvider:
         if data and data.history:
             return data.history[-1].close
         return None
+
+    def list_symbols(self) -> list[SymbolInfo]:
+        return []
 
 
 provider = YahooFinanceProvider()
