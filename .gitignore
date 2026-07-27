@@ -6,4 +6,3 @@ logs/
 dist/
 .venv/
 app/data/provider_cache/
-*.json
