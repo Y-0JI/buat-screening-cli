@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
 from app.tools import get_provider
 from app.screeners.engine import screen_stock
+from app.services import stock_list
 
 provider = get_provider()
 from app.indicators.engine import sma, rsi, macd, bollinger
@@ -61,10 +62,12 @@ def run_screening(data: StockData) -> list[ScreeningResult]:
 
 def build_context(data: StockData) -> dict:
     dq = build_data_quality_report(data)
+    name = stock_list.resolve_name(data.info.ticker) or data.info.name
+    sector = stock_list.resolve_sector(data.info.ticker) or data.info.sector or "-"
     return {
         "ticker": data.info.ticker,
-        "name": data.info.name,
-        "sector": data.info.sector or "-",
+        "name": name,
+        "sector": sector,
         "price": data.history[-1].close if data.history else 0,
         "change": _calc_change(data),
         "indicators": _calc_indicators(data),
@@ -76,7 +79,7 @@ def build_context(data: StockData) -> dict:
 
 def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
     time.sleep(random.uniform(0, 0.15))
-    data = provider.fetch(t, period="3mo")
+    data = provider.fetch(t, period="3mo", need_profile=False)
     if not data:
         return None, "error"
     signals = screen_stock(data)
@@ -84,8 +87,8 @@ def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
         return None, None
     return {
         "ticker": t,
-        "name": data.info.name,
-        "sector": data.info.sector,
+        "name": stock_list.resolve_name(t) or data.info.name,
+        "sector": stock_list.resolve_sector(t) or data.info.sector,
         "price": data.history[-1].close,
         "signals": signals,
         "max_confidence": max(s.confidence for s in signals),
@@ -110,7 +113,7 @@ def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
 
 def _fetch_with_stagger(t: str, period: str = "5d") -> StockData | None:
     time.sleep(random.uniform(0, 0.15))
-    return provider.fetch(t, period)
+    return provider.fetch(t, period, need_profile=False)
 
 
 def _bulk_by_change(tickers: list[str], reverse: bool) -> tuple[list[dict], list[str], list[str]]:

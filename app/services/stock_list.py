@@ -27,3 +27,19 @@ def search(query: str) -> list[dict]:
 
 def count() -> int:
     return len(get_all())
+
+_cache: dict[str, dict] | None = None
+
+def _by_ticker() -> dict[str, dict]:
+    global _cache
+    if _cache is None:
+        _cache = {s["ticker"]: s for s in get_all()}
+    return _cache
+
+def resolve_name(ticker: str) -> str | None:
+    s = _by_ticker().get(ticker.upper())
+    return s["name"] if s else None
+
+def resolve_sector(ticker: str) -> str | None:
+    s = _by_ticker().get(ticker.upper())
+    return s.get("sector") if s else None

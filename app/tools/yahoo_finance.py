@@ -40,18 +40,21 @@ class YahooFinanceProvider:
         for attempt in range(3):
             try:
                 stock = yf.Ticker(ticker + ".JK")
-                info = stock.info
+                if need_profile:
+                    info = stock.info
+                    stock_info = StockInfo(
+                        ticker=ticker.upper(),
+                        name=info.get("longName", ticker.upper()),
+                        sector=info.get("sector"),
+                        market_cap=info.get("marketCap"),
+                        currency=info.get("currency", "IDR"),
+                    )
+                else:
+                    stock_info = StockInfo(ticker=ticker.upper())
                 hist = stock.history(period=period)
                 if hist.empty:
                     logger.debug(f"Data kosong untuk {ticker}")
                     return None
-                stock_info = StockInfo(
-                    ticker=ticker.upper(),
-                    name=info.get("longName", ticker.upper()),
-                    sector=info.get("sector"),
-                    market_cap=info.get("marketCap"),
-                    currency=info.get("currency", "IDR"),
-                )
                 history = [
                     HistoricalPrice(
                         date=row.name.date(),
