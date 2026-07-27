@@ -15,7 +15,7 @@
     "ticker": "ABBA",
     "name": "Mahaka Media Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ABDA",
@@ -51,7 +51,7 @@
     "ticker": "ADCP",
     "name": "Adhi Commuter Properti Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ADES",
@@ -99,7 +99,7 @@
     "ticker": "AGAR",
     "name": "Asia Sejahtera Mina Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "AGII",
@@ -141,7 +141,7 @@
     "ticker": "AKKU",
     "name": "Anugerah Kagum Karya Utama Tbk",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "AKPI",
@@ -177,19 +177,19 @@
     "ticker": "ALKA",
     "name": "Alakasa Industrindo Tbk",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ALMI",
     "name": "Alumindo Light Metal Industry",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ALTO",
     "name": "Tri Banyan Tirta Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "AMAG",
@@ -321,7 +321,7 @@
     "ticker": "ARKA",
     "name": "Arkha Jayanti Persada Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ARKO",
@@ -351,7 +351,7 @@
     "ticker": "ARTI",
     "name": "Ratu Prabu Energi Tbk",
     "sector": "Energy",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ARTO",
@@ -549,7 +549,7 @@
     "ticker": "BATA",
     "name": "Sepatu Bata Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BATR",
@@ -675,7 +675,7 @@
     "ticker": "BEBS",
     "name": "Berkah Beton Sadaya Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BEEF",
@@ -735,7 +735,7 @@
     "ticker": "BHAT",
     "name": "Bhakti Multi Artha Tbk.",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BHIT",
@@ -747,19 +747,19 @@
     "ticker": "BIKA",
     "name": "Binakarya Jaya Abadi Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BIKE",
     "name": "Sepeda Bersama Indonesia Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BIMA",
     "name": "Primarindo Asia Infrastructure",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BINA",
@@ -843,7 +843,7 @@
     "ticker": "BLTZ",
     "name": "Graha Layar Prima Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BLUE",
@@ -951,7 +951,7 @@
     "ticker": "BOSS",
     "name": "Borneo Olah Sarana Sukses Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BPFI",
@@ -1047,7 +1047,7 @@
     "ticker": "BSWD",
     "name": "Bank Of India Indonesia Tbk.",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "BTEK",
@@ -1155,7 +1155,7 @@
     "ticker": "CANI",
     "name": "Capitol Nusantara Indonesia Tb",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CARE",
@@ -1311,7 +1311,7 @@
     "ticker": "CMPP",
     "name": "AirAsia Indonesia Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CMRY",
@@ -1323,7 +1323,7 @@
     "ticker": "CNKO",
     "name": "Exploitasi Energi Indonesia Tb",
     "sector": "Energy",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CNMA",
@@ -1335,7 +1335,7 @@
     "ticker": "CNTX",
     "name": "Century Textile Industry Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "COAL",
@@ -1377,7 +1377,7 @@
     "ticker": "CRAB",
     "name": "Toba Surimi Industries Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "CRSN",
@@ -1479,7 +1479,7 @@
     "ticker": "DEAL",
     "name": "Dewata Freightinternational Tb",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "DEFI",
@@ -1533,7 +1533,7 @@
     "ticker": "DIGI",
     "name": "Arkadia Digital Media Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "DILD",
@@ -1611,7 +1611,7 @@
     "ticker": "DPNS",
     "name": "Duta Pertiwi Nusantara Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "DPUM",
@@ -1689,7 +1689,7 @@
     "ticker": "EDGE",
     "name": "Indointernet Tbk.",
     "sector": "Technology",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "EKAD",
@@ -1815,7 +1815,7 @@
     "ticker": "ETWA",
     "name": "Eterindo Wahanatama Tbk",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "EURO",
@@ -1845,7 +1845,7 @@
     "ticker": "FASW",
     "name": "Fajar Surya Wisesa Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "FILM",
@@ -1857,7 +1857,7 @@
     "ticker": "FIMP",
     "name": "Fimperkasa Utama Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "FIRE",
@@ -1899,7 +1899,7 @@
     "ticker": "FOOD",
     "name": "Sentra Food Indonesia Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "FORU",
@@ -2007,7 +2007,7 @@
     "ticker": "GLOB",
     "name": "Globe Kita Terang Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "GLVA",
@@ -2097,7 +2097,7 @@
     "ticker": "GTBO",
     "name": "Garda Tujuh Buana Tbk",
     "sector": "Energy",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "GTRA",
@@ -2223,13 +2223,13 @@
     "ticker": "HILL",
     "name": "Hillcon Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "HITS",
     "name": "Humpuss Intermoda Transportasi",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "HKMU",
@@ -2313,7 +2313,7 @@
     "ticker": "IBFN",
     "name": "Intan Baru Prana Tbk.",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "IBOS",
@@ -2325,7 +2325,7 @@
     "ticker": "IBST",
     "name": "Inti Bangun Sejahtera Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ICBP",
@@ -2421,7 +2421,7 @@
     "ticker": "INAF",
     "name": "Indofarma Tbk.",
     "sector": "Healthcare",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "INAI",
@@ -2433,7 +2433,7 @@
     "ticker": "INCF",
     "name": "Indo Komoditi Korpora Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "INCI",
@@ -2475,7 +2475,7 @@
     "ticker": "INDX",
     "name": "Tanah Laut Tbk",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "INDY",
@@ -2523,13 +2523,13 @@
     "ticker": "INRU",
     "name": "Toba Pulp Lestari Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "INTA",
     "name": "Intraco Penta Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "INTD",
@@ -2577,7 +2577,7 @@
     "ticker": "IPPE",
     "name": "Indo Pureco Pratama Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "IPTV",
@@ -2703,7 +2703,7 @@
     "ticker": "JMAS",
     "name": "Asuransi Jiwa Syariah Jasa Mit",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "JPFA",
@@ -2751,13 +2751,13 @@
     "ticker": "KARW",
     "name": "Meratus Jasa Prima Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "KAYU",
     "name": "Darmi Bersaudara Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "KBAG",
@@ -2823,7 +2823,7 @@
     "ticker": "KIAS",
     "name": "Keramika Indonesia Assosiasi T",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "KICI",
@@ -2919,7 +2919,7 @@
     "ticker": "KOIN",
     "name": "Kokoh Inti Arebama Tbk",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "KOKA",
@@ -3099,7 +3099,7 @@
     "ticker": "LMSH",
     "name": "Lionmesh Prima Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "LOPI",
@@ -3237,7 +3237,7 @@
     "ticker": "MARI",
     "name": "Mahaka Radio Integra Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MARK",
@@ -3255,7 +3255,7 @@
     "ticker": "MASB",
     "name": "Bank Multiarta Sentosa Tbk.",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MAXI",
@@ -3345,7 +3345,7 @@
     "ticker": "MDRN",
     "name": "Modern Internasional Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MEDC",
@@ -3375,7 +3375,7 @@
     "ticker": "MENN",
     "name": "Menn Teknologi Indonesia Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MERK",
@@ -3387,7 +3387,7 @@
     "ticker": "META",
     "name": "Nusantara Infrastructure Tbk.",
     "sector": "",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MFIN",
@@ -3399,7 +3399,7 @@
     "ticker": "MFMI",
     "name": "Multifiling Mitra Indonesia Tb",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MGLV",
@@ -3471,7 +3471,7 @@
     "ticker": "MKNT",
     "name": "Mitra Komunikasi Nusantara Tbk",
     "sector": "Technology",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MKPI",
@@ -3567,7 +3567,7 @@
     "ticker": "MPRO",
     "name": "Maha Properti Indonesia Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MPXL",
@@ -3585,7 +3585,7 @@
     "ticker": "MREI",
     "name": "Maskapai Reasuransi Indonesia",
     "sector": "Financial Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MSIE",
@@ -3633,7 +3633,7 @@
     "ticker": "MTFN",
     "name": "Capitalinc Investment Tbk.",
     "sector": "Energy",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MTLA",
@@ -3651,7 +3651,7 @@
     "ticker": "MTPS",
     "name": "Meta Epsi Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MTRA",
@@ -3663,7 +3663,7 @@
     "ticker": "MTSM",
     "name": "Metro Realty Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "MTWI",
@@ -3699,7 +3699,7 @@
     "ticker": "MYTX",
     "name": "Asia Pacific Investama Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "NAIK",
@@ -3777,7 +3777,7 @@
     "ticker": "NICK",
     "name": "Charnic Capital Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "NICL",
@@ -4095,7 +4095,7 @@
     "ticker": "PLIN",
     "name": "Plaza Indonesia Realty Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PMJS",
@@ -4107,7 +4107,7 @@
     "ticker": "PMMP",
     "name": "Panca Mitra Multiperdana Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PNBN",
@@ -4161,7 +4161,7 @@
     "ticker": "POLL",
     "name": "Pollux Properties Indonesia Tb",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "POLU",
@@ -4173,7 +4173,7 @@
     "ticker": "POLY",
     "name": "Asia Pacific Fibers Tbk",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "POOL",
@@ -4287,7 +4287,7 @@
     "ticker": "PTDU",
     "name": "Djasa Ubersakti Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PTIS",
@@ -4305,7 +4305,7 @@
     "ticker": "PTMR",
     "name": "Master Print Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "PTPP",
@@ -4395,7 +4395,7 @@
     "ticker": "RAFI",
     "name": "Sari Kreasi Boga Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "RAJA",
@@ -4437,7 +4437,7 @@
     "ticker": "RDTX",
     "name": "Roda Vivatex Tbk",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "REAL",
@@ -4587,7 +4587,7 @@
     "ticker": "SBAT",
     "name": "Sejahtera Bintang Abadi Textil",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SBMA",
@@ -4761,7 +4761,7 @@
     "ticker": "SMCB",
     "name": "Solusi Bangun Indonesia Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SMDM",
@@ -4893,7 +4893,7 @@
     "ticker": "SOUL",
     "name": "Mitra Tirta Buwana Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SPMA",
@@ -5007,7 +5007,7 @@
     "ticker": "SUPR",
     "name": "Solusi Tunas Pratama Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SURE",
@@ -5025,7 +5025,7 @@
     "ticker": "SWAT",
     "name": "Sriwahana Adityakarta Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "SWID",
@@ -5073,7 +5073,7 @@
     "ticker": "TAYS",
     "name": "Jaya Swarasa Agung Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TBIG",
@@ -5127,7 +5127,7 @@
     "ticker": "TELE",
     "name": "Omni Inovasi Indonesia Tbk.",
     "sector": "Communication Services",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TFAS",
@@ -5151,13 +5151,13 @@
     "ticker": "TGRA",
     "name": "Terregra Asia Energy Tbk.",
     "sector": "Utilities",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TGUK",
     "name": "Platinum Wahab Nusantara Tbk.",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TIFA",
@@ -5181,7 +5181,7 @@
     "ticker": "TIRT",
     "name": "Tirta Mahakam Resources Tbk",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TKIM",
@@ -5235,7 +5235,7 @@
     "ticker": "TOPS",
     "name": "Totalindo Eka Persada Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TOSK",
@@ -5265,7 +5265,7 @@
     "ticker": "TOYS",
     "name": "Sunindo Adipersada Tbk.",
     "sector": "Consumer Cyclical",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TPIA",
@@ -5343,7 +5343,7 @@
     "ticker": "TRUE",
     "name": "Triniti Dinamik Tbk.",
     "sector": "Real Estate",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "TRUK",
@@ -5427,7 +5427,7 @@
     "ticker": "UNSP",
     "name": "Bakrie Sumatera Plantations Tb",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "UNTD",
@@ -5553,7 +5553,7 @@
     "ticker": "WICO",
     "name": "Wicaksana Overseas Internation",
     "sector": "Consumer Defensive",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "WIDI",
@@ -5577,7 +5577,7 @@
     "ticker": "WIKA",
     "name": "Wijaya Karya (Persero) Tbk.",
     "sector": "Industrials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "WINE",
@@ -5637,7 +5637,7 @@
     "ticker": "WSBP",
     "name": "Waskita Beton Precast Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "WSKT",
@@ -5685,13 +5685,13 @@
     "ticker": "ZBRA",
     "name": "Dosni Roha Indonesia Tbk.",
     "sector": "Healthcare",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ZINC",
     "name": "Kapuas Prima Coal Tbk.",
     "sector": "Basic Materials",
-    "valid": true
+    "valid": false
   },
   {
     "ticker": "ZONE",

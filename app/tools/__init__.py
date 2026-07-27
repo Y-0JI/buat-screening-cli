@@ -26,7 +26,7 @@ class FallbackProvider:
             try:
                 data = provider.fetch(ticker, period, need_profile)
                 if data:
-                    logger.info(f"{name}: success for {ticker}")
+                    logger.debug(f"{name}: success for {ticker}")
                     self.cache.save(ticker, period, need_profile, data)
                     return data
                 logger.warning(f"{name}: no data for {ticker}")

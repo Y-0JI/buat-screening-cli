@@ -32,6 +32,7 @@ def _classify_error(e: Exception) -> str:
 class YahooFinanceProvider:
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         if ticker.upper() in _invalid_tickers:
+            logger.debug(f"Skip {ticker}: already in invalid cache")
             return None
         cooldown = time.time() - _last_rate_limit[0]
         if cooldown < 15:

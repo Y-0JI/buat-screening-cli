@@ -22,7 +22,7 @@ class IDXProvider:
         client.get("https://www.idx.co.id/primary/home/GetIndexList")
         self._client = client
 
-    def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
+    def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         self._ensure_session()
         for attempt in range(3):
             try:
