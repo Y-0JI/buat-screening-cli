@@ -14,7 +14,7 @@ _NOT_FOUND_PATTERNS = [
     "symbol may be delisted",
 ]
 _RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
-_last_rate_limit: float = 0.0  # ponytail: global cooldown for all workers
+_last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
 
 
@@ -30,29 +30,31 @@ def _classify_error(e: Exception) -> str:
 
 
 class YahooFinanceProvider:
-    def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
-        global _last_rate_limit
+    def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         if ticker.upper() in _invalid_tickers:
             return None
-        cooldown = time.time() - _last_rate_limit
+        cooldown = time.time() - _last_rate_limit[0]
         if cooldown < 15:
             time.sleep(15 - cooldown)
         time.sleep(random.uniform(0.3, 0.8))
         for attempt in range(3):
             try:
                 stock = yf.Ticker(ticker + ".JK")
-                info = stock.info
+                if need_profile:
+                    info = stock.info
+                    stock_info = StockInfo(
+                        ticker=ticker.upper(),
+                        name=info.get("longName", ticker.upper()),
+                        sector=info.get("sector"),
+                        market_cap=info.get("marketCap"),
+                        currency=info.get("currency", "IDR"),
+                    )
+                else:
+                    stock_info = StockInfo(ticker=ticker.upper(), name=ticker.upper())
                 hist = stock.history(period=period)
                 if hist.empty:
                     logger.debug(f"Data kosong untuk {ticker}")
                     return None
-                stock_info = StockInfo(
-                    ticker=ticker.upper(),
-                    name=info.get("longName", ticker.upper()),
-                    sector=info.get("sector"),
-                    market_cap=info.get("marketCap"),
-                    currency=info.get("currency", "IDR"),
-                )
                 history = [
                     HistoricalPrice(
                         date=row.name.date(),
@@ -73,7 +75,7 @@ class YahooFinanceProvider:
                         logger.debug(f"Ticker tidak ditemukan {ticker}: {e}")
                     return None
                 if kind == "rate_limited":
-                    _last_rate_limit = time.time()
+                    _last_rate_limit[0] = time.time()
                     delay = random.uniform(10, 30)
                     logger.warning(f"Rate limited {ticker}, cooling {delay:.0f}s (attempt {attempt+1}/3)")
                     time.sleep(delay)
