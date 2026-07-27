@@ -5,9 +5,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
-import yfinance as yf
+from app.tools.yahoo_finance import YahooFinanceProvider
 
-from app.tools.yahoo_finance import _last_rate_limit, _RATE_LIMITED_PATTERNS
+_provider = YahooFinanceProvider()
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
 _TIMESTAMP_PATH = os.path.join(os.path.dirname(__file__), "..", "data", ".universe_validated")
@@ -15,22 +15,12 @@ _BATCH_SIZE = 50
 
 
 def _check(ticker: str) -> tuple[str, str]:
-    cooldown = time.time() - _last_rate_limit[0]
-    if cooldown < 15:
-        time.sleep(15 - cooldown)
     try:
-        hist = yf.download(ticker + ".JK", period="1d", progress=False)
-        if not hist.empty:
+        data = _provider.fetch(ticker, period="1d", need_profile=False)
+        if data:
             return ticker, "valid"
         return ticker, "not_found"
-    except Exception as e:
-        msg = str(e).lower()
-        for pat in _RATE_LIMITED_PATTERNS:
-            if pat in msg:
-                _last_rate_limit[0] = time.time()
-                return ticker, "rate_limited"
-        if "delisted" in msg or "no price data found" in msg:
-            return ticker, "not_found"
+    except Exception:
         return ticker, "error"
 
 

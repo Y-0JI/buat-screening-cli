@@ -1,6 +1,7 @@
 import re
 from dataclasses import dataclass
 from typing import Literal
+from app.validation import normalize
 
 
 INTENT_ANALYZE = "analyze"
@@ -32,10 +33,10 @@ def detect_research_intent(query: str) -> ResearchIntent:
     if any(w in q for w in ["analisa", "analisis", "analyze"]):
         for w in words:
             if w.isalpha() and 3 <= len(w) <= 5:
-                return ResearchIntent("single_stock", [w.upper()], None, query)
+                return ResearchIntent("single_stock", [normalize(w)], None, query)
 
     if any(w in q for w in ["bandingkan", "bandingin", "compare", "vs", "versus"]):
-        tickers = [w.upper() for w in words if w.isalpha() and 3 <= len(w) <= 5]
+        tickers = [normalize(w) for w in words if w.isalpha() and 3 <= len(w) <= 5]
         if len(tickers) >= 2:
             return ResearchIntent("comparative", tickers[:2], None, query)
 
@@ -63,8 +64,8 @@ def parse(text: str) -> tuple[str, dict]:
         text_lower,
     )
     if compare_match:
-        t1 = compare_match.group(1).upper()
-        t2 = compare_match.group(2).upper() if compare_match.group(2) else ""
+        t1 = normalize(compare_match.group(1))
+        t2 = normalize(compare_match.group(2)) if compare_match.group(2) else ""
         if len(t2) < 2:
             tickers = t1
         else:
@@ -98,7 +99,7 @@ def parse(text: str) -> tuple[str, dict]:
     for pat in analyze_patterns:
         m = re.search(pat, text_lower)
         if m:
-            ticker = m.group(1).upper()
+            ticker = normalize(m.group(1))
             if len(ticker) <= 5 and ticker.isalpha():
                 return INTENT_ANALYZE, {"ticker": ticker}
 

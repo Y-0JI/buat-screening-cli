@@ -1,5 +1,6 @@
 import json
 import os
+from app.validation import normalize
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
 
@@ -37,9 +38,9 @@ def _by_ticker() -> dict[str, dict]:
     return _cache
 
 def resolve_name(ticker: str) -> str | None:
-    s = _by_ticker().get(ticker.upper())
+    s = _by_ticker().get(normalize(ticker))
     return s["name"] if s else None
 
 def resolve_sector(ticker: str) -> str | None:
-    s = _by_ticker().get(ticker.upper())
+    s = _by_ticker().get(normalize(ticker))
     return s.get("sector") if s else None
