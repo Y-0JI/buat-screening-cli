@@ -4,7 +4,7 @@ from app.tools.idx import IDXProvider
 from app.tools.cache import ProviderCache
 from app.config.settings import settings
 from app.models.stock import StockData
-from app.validation import is_valid
+from app.validation import is_valid, normalize
 
 _providers = {
     "yahoo": YahooFinanceProvider(),
@@ -22,6 +22,7 @@ class FallbackProvider:
         self.cache = cache
 
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
+        ticker = normalize(ticker)
         if not is_valid(ticker):
             logger.warning(f"Invalid symbol rejected: {ticker}")
             return None
@@ -44,6 +45,7 @@ class FallbackProvider:
         return None
 
     def get_price(self, ticker: str) -> float | None:
+        ticker = normalize(ticker)
         if not is_valid(ticker):
             return None
         for provider in self.providers:

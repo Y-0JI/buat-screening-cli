@@ -3,6 +3,7 @@ import time
 from pathlib import Path
 from loguru import logger
 from app.models.stock import StockData
+from app.validation import normalize
 
 _CACHE_DIR = Path(__file__).parent.parent / "data" / "provider_cache"
 
@@ -14,7 +15,7 @@ class ProviderCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, ticker: str, period: str, need_profile: bool) -> Path:
-        safe = f"{ticker.upper()}_{period}_{need_profile}"
+        safe = f"{normalize(ticker)}_{period}_{need_profile}"
         return self.cache_dir / f"{safe}.json"
 
     def save(self, ticker: str, period: str, need_profile: bool, data: StockData) -> None:

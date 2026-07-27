@@ -1,4 +1,4 @@
-from app.validation import is_valid, validate
+from app.validation import is_valid, validate, normalize
 
 
 def test_valid_symbols():
@@ -19,3 +19,15 @@ def test_validate_returns_message():
 
 def test_validate_returns_none():
     assert validate("BBCA") is None
+
+
+def test_normalize_strips_whitespace():
+    assert normalize("  BBCA  ") == "BBCA"
+
+
+def test_normalize_uppercases():
+    assert normalize("bbca") == "BBCA"
+
+
+def test_normalize_idempotent():
+    assert normalize(normalize("  bBcA  ")) == normalize("bBcA")

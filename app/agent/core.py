@@ -4,6 +4,7 @@ from app.router.engine import fetch_stock, build_context, run_screening, bulk_sc
 from app.models.analysis import AIAnalysis
 from app.services.llm import chat_completion
 from app.services.stock_list import search
+from app.validation import normalize
 
 _PROMPT_DIR = os.path.join(os.path.dirname(__file__), "..", "prompts")
 
@@ -25,9 +26,10 @@ def _render_template(template: str, **kwargs) -> str:
 
 
 def analyze_with_ai(ticker: str) -> AIAnalysis:
-    data = fetch_stock(ticker)
+    t = normalize(ticker)
+    data = fetch_stock(t)
     if not data:
-        return AIAnalysis(ticker=ticker.upper(), summary="Data tidak ditemukan", conclusion="Gagal mengambil data")
+        return AIAnalysis(ticker=t, summary="Data tidak ditemukan", conclusion="Gagal mengambil data")
 
     ctx = build_context(data)
     prompt = _load_prompt("analysis.md")
@@ -41,14 +43,14 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
 
     if llm_result:
         return AIAnalysis(
-            ticker=ticker.upper(),
+            ticker=t,
             summary=llm_result,
             key_metrics=_extract_metrics(ctx["indicators"]),
             raw_data=data,
         )
 
     return AIAnalysis(
-        ticker=ticker.upper(),
+        ticker=t,
         summary="Analisis AI tidak tersedia (periksa konfigurasi AI di .env)",
         key_metrics={"indikator": ctx["indicators"]},
         risks=[],
@@ -135,7 +137,7 @@ def ask_llm(user_query: str, context: str = "", messages: list[dict] | None = No
 def _run_tool(name: str, args: list[str]) -> str | None:
     from app.services.stock_list import get_all
     if name == "analyze":
-        ticker = args[0].upper() if args else ""
+        ticker = normalize(args[0]) if args else ""
         if not ticker:
             return None
         data = fetch_stock(ticker)
@@ -156,7 +158,7 @@ def _run_tool(name: str, args: list[str]) -> str | None:
     if name == "compare":
         if len(args) < 2:
             return None
-        tickers = [a.upper() for a in args[:2]]
+        tickers = [normalize(a) for a in args[:2]]
         parts = []
         for t in tickers:
             data = fetch_stock(t)

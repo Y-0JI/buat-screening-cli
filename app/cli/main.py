@@ -9,7 +9,7 @@ from app.services.stock_list import get_all, search
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.validate_universe import run as validate_run, last_validated_days
-from app.validation import validate as validate_symbol
+from app.validation import normalize, validate as validate_symbol
 from typing import Optional
 
 _p = RichPresenter()
@@ -45,20 +45,22 @@ def analyze(ticker: str) -> None:
     if err:
         _p.error(err)
         raise typer.Exit(1)
-    with console.status(f"[bold blue]Menganalisis {ticker.upper()}..."):
-        result = analyze_with_ai(ticker)
+    t = normalize(ticker)
+    with console.status(f"[bold blue]Menganalisis {t}..."):
+        result = analyze_with_ai(t)
     _p.analysis(result)
 
 
 @app.command()
 def trend(ticker: str) -> None:
-    err = validate_symbol(ticker)
+    t = normalize(ticker)
+    err = validate_symbol(t)
     if err:
         _p.error(err)
         raise typer.Exit(1)
-    data = fetch_stock(ticker)
+    data = fetch_stock(t)
     if not data:
-        _p.error(f"Data untuk {ticker.upper()} tidak ditemukan")
+        _p.error(f"Data untuk {t} tidak ditemukan")
         raise typer.Exit(1)
     ctx = build_context(data)
     _p.stock_header(data)
@@ -68,13 +70,14 @@ def trend(ticker: str) -> None:
 
 @app.command()
 def score(ticker: str) -> None:
-    err = validate_symbol(ticker)
+    t = normalize(ticker)
+    err = validate_symbol(t)
     if err:
         _p.error(err)
         raise typer.Exit(1)
-    data = fetch_stock(ticker)
+    data = fetch_stock(t)
     if not data:
-        _p.error(f"Data untuk {ticker.upper()} tidak ditemukan")
+        _p.error(f"Data untuk {t} tidak ditemukan")
         raise typer.Exit(1)
     results = run_screening(data)
     _p.stock_header(data)
@@ -90,7 +93,7 @@ def compare(
     ticker2: str = typer.Argument("", help="Ticker kedua (opsional)"),
 ) -> None:
     tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
-    tickers = [t.strip().upper() for t in tickers_str.replace(",", " ").split()]
+    tickers = [normalize(t) for t in tickers_str.replace(",", " ").split()]
     for t in tickers:
         err = validate_symbol(t)
         if err:
