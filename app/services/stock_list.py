@@ -1,5 +1,7 @@
 import json
 import os
+from loguru import logger
+from app.models.symbol import SymbolInfo
 from app.validation import normalize
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
@@ -44,3 +46,15 @@ def resolve_name(ticker: str) -> str | None:
 def resolve_sector(ticker: str) -> str | None:
     s = _by_ticker().get(normalize(ticker))
     return s.get("sector") if s else None
+
+
+def merge_and_dedup(sources: list[list[SymbolInfo]]) -> list[SymbolInfo]:
+    seen: dict[str, SymbolInfo] = {}
+    for symbols in sources:
+        for sym in symbols:
+            t = normalize(sym.ticker) if sym.ticker else ""
+            if not t:
+                continue
+            if t not in seen:
+                seen[t] = sym
+    return list(seen.values())

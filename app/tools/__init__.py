@@ -4,6 +4,7 @@ from app.tools.idx import IDXProvider
 from app.tools.cache import ProviderCache
 from app.config.settings import settings
 from app.models.stock import StockData
+from app.models.symbol import SymbolInfo
 from app.validation import is_valid, normalize
 
 _providers = {
@@ -56,6 +57,12 @@ class FallbackProvider:
             except Exception:
                 continue
         return None
+
+    def list_symbols(self) -> list[SymbolInfo]:
+        results = []
+        for provider in self.providers:
+            results.extend(provider.list_symbols())
+        return results
 
 
 def get_provider(name: str | None = None):
