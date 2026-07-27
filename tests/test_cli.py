@@ -140,3 +140,23 @@ def test_natural_help():
 def test_natural_unknown():
     result = runner.invoke(app, ["natural", "lalala"])
     assert result.exit_code == 0
+
+
+def test_analyze_invalid_ticker():
+    result = runner.invoke(app, ["analyze", "ABCDEFGHIJK"])
+    assert result.exit_code != 0
+
+
+def test_trend_invalid_ticker():
+    result = runner.invoke(app, ["trend", ""])
+    assert result.exit_code != 0
+
+
+def test_score_invalid_ticker():
+    result = runner.invoke(app, ["score", "ABCDEFGHIJK"])
+    assert result.exit_code != 0
+
+
+def test_compare_invalid_ticker():
+    result = runner.invoke(app, ["compare", "BBCA", "ABCDEFGHIJK"])
+    assert result.exit_code != 0

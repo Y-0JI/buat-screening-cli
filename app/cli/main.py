@@ -9,6 +9,7 @@ from app.services.stock_list import get_all, search
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.validate_universe import run as validate_run, last_validated_days
+from app.validation import validate as validate_symbol
 from typing import Optional
 
 _p = RichPresenter()
@@ -40,6 +41,10 @@ def main() -> None:
 
 @app.command()
 def analyze(ticker: str) -> None:
+    err = validate_symbol(ticker)
+    if err:
+        _p.error(err)
+        raise typer.Exit(1)
     with console.status(f"[bold blue]Menganalisis {ticker.upper()}..."):
         result = analyze_with_ai(ticker)
     _p.analysis(result)
@@ -47,6 +52,10 @@ def analyze(ticker: str) -> None:
 
 @app.command()
 def trend(ticker: str) -> None:
+    err = validate_symbol(ticker)
+    if err:
+        _p.error(err)
+        raise typer.Exit(1)
     data = fetch_stock(ticker)
     if not data:
         _p.error(f"Data untuk {ticker.upper()} tidak ditemukan")
@@ -59,6 +68,10 @@ def trend(ticker: str) -> None:
 
 @app.command()
 def score(ticker: str) -> None:
+    err = validate_symbol(ticker)
+    if err:
+        _p.error(err)
+        raise typer.Exit(1)
     data = fetch_stock(ticker)
     if not data:
         _p.error(f"Data untuk {ticker.upper()} tidak ditemukan")
@@ -78,6 +91,11 @@ def compare(
 ) -> None:
     tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
     tickers = [t.strip().upper() for t in tickers_str.replace(",", " ").split()]
+    for t in tickers:
+        err = validate_symbol(t)
+        if err:
+            _p.error(err)
+            raise typer.Exit(1)
     with console.status(f"[bold blue]Membandingkan {', '.join(tickers)}..."):
         result = compare_with_ai(tickers)
     if result["type"] == "error":
