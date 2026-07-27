@@ -5,3 +5,4 @@ logs/
 *.egg-info/
 dist/
 .venv/
+app/data/provider_cache/

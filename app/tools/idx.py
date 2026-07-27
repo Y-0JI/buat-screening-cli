@@ -22,48 +22,53 @@ class IDXProvider:
         client.get("https://www.idx.co.id/primary/home/GetIndexList")
         self._client = client
 
-    def fetch(self, ticker: str, period: str = "6mo") -> StockData | None:
+    def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         self._ensure_session()
-        try:
-            raw = self._client.get(
-                "https://www.idx.co.id/primary/ListedCompany/GetTradingInfoSS",
-                params={"code": ticker, "start": 0, "length": 1000},
-            ).json()
-            if not raw or not raw.get("replies"):
-                logger.info(f"Data kosong untuk {ticker}")
-                return None
-            replies = raw["replies"]
-            history = []
-            cutoff = _parse_period(period)
-            for r in replies:
-                d = _parse_date(r.get("Date", ""))
-                if not d:
-                    continue
-                if cutoff and d < cutoff:
-                    continue
-                history.append(HistoricalPrice(
-                    date=d,
-                    open=float(r.get("OpenPrice", 0)),
-                    high=float(r.get("High", 0)),
-                    low=float(r.get("Low", 0)),
-                    close=float(r.get("Close", 0)),
-                    volume=int(r.get("Volume", 0)),
-                ))
-            if not history:
-                return None
-            history.sort(key=lambda h: h.date)
-            meta = self._fetch_meta(ticker)
-            return StockData(
-                info=StockInfo(
-                    ticker=ticker.upper(),
-                    name=meta.get("name", ticker.upper()),
-                    sector=meta.get("sector"),
-                ),
-                history=history,
-            )
-        except Exception as e:
-            logger.warning(f"Gagal fetch IDX {ticker}: {e}")
-            return None
+        for attempt in range(3):
+            try:
+                raw = self._client.get(
+                    "https://www.idx.co.id/primary/ListedCompany/GetTradingInfoSS",
+                    params={"code": ticker, "start": 0, "length": 1000},
+                ).json()
+                if not raw or not raw.get("replies"):
+                    logger.info(f"Data kosong untuk {ticker}")
+                    return None
+                replies = raw["replies"]
+                history = []
+                cutoff = _parse_period(period)
+                for r in replies:
+                    d = _parse_date(r.get("Date", ""))
+                    if not d:
+                        continue
+                    if cutoff and d < cutoff:
+                        continue
+                    history.append(HistoricalPrice(
+                        date=d,
+                        open=float(r.get("OpenPrice", 0)),
+                        high=float(r.get("High", 0)),
+                        low=float(r.get("Low", 0)),
+                        close=float(r.get("Close", 0)),
+                        volume=int(r.get("Volume", 0)),
+                    ))
+                if not history:
+                    return None
+                history.sort(key=lambda h: h.date)
+                meta = self._fetch_meta(ticker)
+                return StockData(
+                    info=StockInfo(
+                        ticker=ticker.upper(),
+                        name=meta.get("name", ticker.upper()),
+                        sector=meta.get("sector"),
+                    ),
+                    history=history,
+                )
+            except Exception as e:
+                if attempt < 2:
+                    logger.debug(f"Retry IDX {ticker} in {attempt+1}s (attempt {attempt+1}/3): {e}")
+                    time.sleep(attempt + 1)
+                else:
+                    logger.warning(f"Gagal fetch IDX {ticker} setelah 3 percobaan: {e}")
+        return None
 
     def get_price(self, ticker: str) -> float | None:
         self._ensure_session()

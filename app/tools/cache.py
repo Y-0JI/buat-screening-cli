@@ -1,0 +1,47 @@
+import os
+import time
+from pathlib import Path
+from loguru import logger
+from app.models.stock import StockData
+
+_CACHE_DIR = Path(__file__).parent.parent / "data" / "provider_cache"
+
+
+class ProviderCache:
+    def __init__(self, cache_dir: str | Path = _CACHE_DIR, ttl_hours: int = 24):
+        self.cache_dir = Path(cache_dir)
+        self.ttl_seconds = ttl_hours * 3600
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _path(self, ticker: str, period: str, need_profile: bool) -> Path:
+        safe = f"{ticker.upper()}_{period}_{need_profile}"
+        return self.cache_dir / f"{safe}.json"
+
+    def save(self, ticker: str, period: str, need_profile: bool, data: StockData) -> None:
+        path = self._path(ticker, period, need_profile)
+        try:
+            path.write_text(data.model_dump_json())
+            logger.debug(f"Cache SAVED: {ticker} ({period})")
+        except Exception as e:
+            logger.warning(f"Cache SAVE failed: {ticker}: {e}")
+
+    def load(self, ticker: str, period: str, need_profile: bool, allow_stale: bool = False) -> StockData | None:
+        path = self._path(ticker, period, need_profile)
+        if not path.exists():
+            logger.debug(f"Cache MISS: {ticker}")
+            return None
+        if not allow_stale:
+            age = time.time() - os.path.getmtime(path)
+            if age > self.ttl_seconds:
+                logger.debug(f"Cache EXPIRED: {ticker}, age={age/3600:.1f}h")
+                return None
+        try:
+            data = StockData.model_validate_json(path.read_text())
+            if allow_stale:
+                logger.warning(f"Cache STALE: {ticker}")
+            else:
+                logger.debug(f"Cache HIT: {ticker}")
+            return data
+        except Exception as e:
+            logger.warning(f"Cache LOAD failed: {ticker}: {e}")
+            return None
