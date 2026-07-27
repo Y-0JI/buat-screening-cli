@@ -81,7 +81,7 @@ def _fetch_and_screen(t: str) -> tuple[dict | None, str | None]:
     time.sleep(random.uniform(0, 0.15))
     data = provider.fetch(t, period="3mo", need_profile=False)
     if not data:
-        return None, "error"
+        return None, "not_found"
     signals = screen_stock(data)
     if not signals:
         return None, None

@@ -67,3 +67,15 @@ def test_fallback_all_fail_no_cache():
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("GAGAL")
     assert result is None
+
+
+def test_fallback_rejects_invalid_symbol():
+    p1 = MagicMock()
+    p2 = MagicMock()
+    cache = MagicMock()
+    fb = FallbackProvider([p1, p2], cache)
+    result = fb.fetch("")
+    assert result is None
+    p1.fetch.assert_not_called()
+    p2.fetch.assert_not_called()
+    cache.save.assert_not_called()
