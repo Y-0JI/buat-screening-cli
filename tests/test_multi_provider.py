@@ -17,7 +17,8 @@ def test_default_provider_from_config_yahoo(monkeypatch):
     importlib.reload(app.tools)
     from app.tools import get_provider
     provider = get_provider()
-    assert type(provider).__name__ == "YahooFinanceProvider"
+    assert type(provider).__name__ == "FallbackProvider"
+    assert any(type(p).__name__ == "YahooFinanceProvider" for p in provider.providers)
 
 
 def test_default_provider_from_config_idx(monkeypatch):
@@ -28,7 +29,8 @@ def test_default_provider_from_config_idx(monkeypatch):
     importlib.reload(app.tools)
     from app.tools import get_provider
     provider = get_provider()
-    assert type(provider).__name__ == "IDXProvider"
+    assert type(provider).__name__ == "FallbackProvider"
+    assert any(type(p).__name__ == "IDXProvider" for p in provider.providers)
 
 
 def test_default_provider_fallback_on_invalid_config(monkeypatch):
@@ -39,4 +41,5 @@ def test_default_provider_fallback_on_invalid_config(monkeypatch):
     importlib.reload(app.tools)
     from app.tools import get_provider
     provider = get_provider()
-    assert type(provider).__name__ == "YahooFinanceProvider"
+    assert type(provider).__name__ == "FallbackProvider"
+    assert any(type(p).__name__ == "YahooFinanceProvider" for p in provider.providers)
