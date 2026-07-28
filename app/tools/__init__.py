@@ -1,20 +1,14 @@
 from loguru import logger
-from app.tools.yahoo_finance import YahooFinanceProvider
-from app.tools.idx import IDXProvider
 from app.tools.cache import ProviderCache
+from app.tools.registry import ProviderRegistry
 from app.config.settings import settings
 from app.models.stock import StockData
 from app.models.symbol import SymbolInfo
 from app.validation import is_valid, normalize
 
-_providers = {
-    "yahoo": YahooFinanceProvider(),
-    "idx": IDXProvider(),
-}
-
-_default = settings.data_provider
-if _default not in _providers:
-    _default = "yahoo"
+# side-effect imports: triggers ProviderRegistry.register() in each module
+import app.tools.yahoo_finance  # noqa: F401
+import app.tools.idx  # noqa: F401
 
 
 class FallbackProvider:
@@ -79,11 +73,12 @@ class FallbackProvider:
 
 def get_provider(name: str | None = None):
     if name:
-        return _providers[name]
+        return ProviderRegistry.get(name)()
     order = settings.provider_fallback_order.split(",")
-    ordered = [p.strip() for p in order if p.strip() in _providers]
+    all_p = ProviderRegistry.all()
+    ordered = [p.strip() for p in order if p.strip() in all_p]
     if not ordered:
-        ordered = [_default]
-    providers = [_providers[p] for p in ordered]
+        ordered = [list(all_p.keys())[0]]
+    providers = [all_p[p]() for p in ordered]
     cache = ProviderCache(ttl_hours=settings.provider_cache_ttl_hours)
     return FallbackProvider(providers, cache)
