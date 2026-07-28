@@ -100,6 +100,7 @@ class YahooFinanceProvider(Provider):
         return None
 
     def list_symbols(self) -> list[SymbolInfo]:
+        """Yahoo Finance tidak punya endpoint daftar emiten IDX yang reliable."""
         return []
 
 

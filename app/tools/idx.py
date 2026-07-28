@@ -1,3 +1,6 @@
+import json
+import os
+import time
 from datetime import date, datetime, timedelta
 import httpx
 from loguru import logger
@@ -100,7 +103,21 @@ class IDXProvider(Provider):
         return {}
 
     def list_symbols(self) -> list[SymbolInfo]:
-        return []
+        path = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
+        try:
+            with open(path) as f:
+                stocks = json.load(f)
+            result = []
+            for s in stocks:
+                result.append(SymbolInfo(
+                    ticker=s.get("ticker", ""),
+                    name=s.get("name"),
+                    sector=s.get("sector"),
+                ))
+            return result
+        except Exception as e:
+            logger.warning(f"IDX: gagal baca daftar emiten: {e}")
+            return []
 
 
 def _parse_date(s: str) -> date | None:

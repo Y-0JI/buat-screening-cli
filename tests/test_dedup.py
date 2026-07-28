@@ -25,11 +25,13 @@ def test_merge_empty():
     assert merge_and_dedup([]) == []
 
 
-def test_list_symbols_empty():
+def test_list_symbols():
     p = YahooFinanceProvider()
-    assert p.list_symbols() == []
+    assert p.list_symbols() == []  # Yahoo tidak punya endpoint daftar emiten IDX
     p2 = IDXProvider()
-    assert p2.list_symbols() == []
+    symbols = p2.list_symbols()
+    assert len(symbols) > 0  # IDX baca dari idx_stocks.json
+    assert symbols[0].ticker  # ticker tidak boleh kosong
 
 
 def test_fallback_list_symbols_empty():

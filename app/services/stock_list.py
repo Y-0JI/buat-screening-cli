@@ -1,10 +1,15 @@
 import json
 import os
+import time
+from dataclasses import asdict
 from loguru import logger
 from app.models.symbol import SymbolInfo
+from app.tools import get_provider
 from app.validation import normalize
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
+_DISCOVERY_CACHE = os.path.join(os.path.dirname(__file__), "..", "data", "discovery_cache.json")
+_DISCOVERY_TTL = 86400  # 24 jam
 
 
 def _load() -> list[dict]:
@@ -58,3 +63,36 @@ def merge_and_dedup(sources: list[list[SymbolInfo]]) -> list[SymbolInfo]:
             if t not in seen:
                 seen[t] = sym
     return list(seen.values())
+
+
+def get_discovered_tickers() -> list[SymbolInfo]:
+    cache_path = _DISCOVERY_CACHE
+    try:
+        if os.path.exists(cache_path):
+            age = time.time() - os.path.getmtime(cache_path)
+            if age < _DISCOVERY_TTL:
+                with open(cache_path) as f:
+                    return [SymbolInfo(**s) for s in json.load(f)]
+    except Exception:
+        pass
+
+    try:
+        p = get_provider()
+        per_provider = [prov.list_symbols() for prov in p.providers]
+        symbols = merge_and_dedup(per_provider)
+        if symbols:
+            try:
+                with open(cache_path, "w") as f:
+                    json.dump([asdict(s) for s in symbols], f)
+            except Exception:
+                pass
+            return symbols
+    except Exception as e:
+        logger.warning(f"Discovery gagal: {e}")
+
+    try:
+        with open(_DATA_PATH) as f:
+            stocks = json.load(f)
+            return [SymbolInfo(ticker=s["ticker"], name=s.get("name"), sector=s.get("sector")) for s in stocks]
+    except Exception:
+        return []

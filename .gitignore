@@ -6,3 +6,4 @@ logs/
 dist/
 .venv/
 app/data/provider_cache/
+app/data/discovery_cache.json
