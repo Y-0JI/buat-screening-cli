@@ -4,7 +4,7 @@ from app.config.settings import settings
 from app.utils.logging import setup_logging
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
-from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
+from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers, health_summary as provider_health
 from app.services.stock_list import get_all, search
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
@@ -19,6 +19,12 @@ def _warn_universe_age():
     days = last_validated_days()
     if days is not None and days > 7:
         console.print(f"[dim]Data universe: {int(days)} hari, jalankan 'screening validate-universe' untuk update[/dim]")
+
+
+def _show_health():
+    h = provider_health()
+    if h:
+        console.print(f"[dim]{h}[/dim]")
 
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
@@ -131,6 +137,7 @@ def screen(
             console.print(f"[yellow]⚠ {len(failed)} saham gagal diproses[/yellow]")
         return
     _print_bulk_screening(results, title=f"Hasil Screening{' — ' + sector if sector else ''}", invalid=invalid, failed=failed)
+    _show_health()
 
 
 @app.command()
@@ -140,6 +147,7 @@ def gainers(limit: int = 10) -> None:
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_gainers(tickers)
     _print_bulk_change(results[:limit], title="Top Gainers", invalid=invalid, failed=failed)
+    _show_health()
 
 
 @app.command()
@@ -149,6 +157,7 @@ def losers(limit: int = 10) -> None:
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_losers(tickers)
     _print_bulk_change(results[:limit], title="Top Losers", invalid=invalid, failed=failed)
+    _show_health()
 
 
 @app.command()
@@ -166,6 +175,7 @@ def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -
             console.print(f"[yellow]⚠ {len(failed)} saham gagal diproses[/yellow]")
         return
     _print_bulk_screening(results, title=f"Hasil Screening — {name}", invalid=invalid, failed=failed)
+    _show_health()
 
 
 @app.command()

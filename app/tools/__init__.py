@@ -21,6 +21,9 @@ class FallbackProvider:
     def __init__(self, providers: list, cache: ProviderCache):
         self.providers = providers
         self.cache = cache
+        self._stats: dict[str, dict] = {}
+        for p in providers:
+            self._stats[type(p).__name__] = {"ok": 0, "fail": 0, "rate_limited": 0}
 
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         ticker = normalize(ticker)
@@ -34,16 +37,25 @@ class FallbackProvider:
                 if data:
                     logger.debug(f"{name}: success for {ticker}")
                     self.cache.save(ticker, period, need_profile, data)
+                    self._stats[name]["ok"] += 1
                     return data
                 logger.warning(f"{name}: no data for {ticker}")
+                self._stats[name]["fail"] += 1
             except Exception as e:
                 logger.warning(f"{name}: failed for {ticker}: {e}")
+                self._stats[name]["rate_limited"] += 1
         cached = self.cache.load(ticker, period, need_profile, allow_stale=True)
         if cached:
             logger.warning(f"All providers failed for {ticker}, returning stale cache")
             return cached
         logger.error(f"All providers failed for {ticker}, no cache available")
         return None
+
+    def health_summary(self) -> str:
+        lines = []
+        for name, c in self._stats.items():
+            lines.append(f"{name}: ok={c['ok']}, fail={c['fail']}, rate_limited={c['rate_limited']}")
+        return "\n".join(lines)
 
     def get_price(self, ticker: str) -> float | None:
         ticker = normalize(ticker)
