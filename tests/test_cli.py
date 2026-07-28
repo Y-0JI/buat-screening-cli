@@ -5,6 +5,7 @@ from typer.testing import CliRunner
 from app.cli.main import app
 from app.models.stock import HistoricalPrice, StockInfo, StockData
 from app.router import engine
+from app.models.symbol import SymbolInfo
 
 runner = CliRunner()
 
@@ -39,25 +40,19 @@ def _mock_fetch(ticker, *args, **kwargs):
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
-def test_analyze_command(mock_stocks, mock_fetch):
+def test_analyze_command(mock_fetch):
     result = runner.invoke(app, ["analyze", "BBCA"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
-def test_trend_command(mock_stocks, mock_fetch):
+def test_trend_command(mock_fetch):
     result = runner.invoke(app, ["trend", "BBCA"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
-def test_score_command(mock_stocks, mock_fetch):
+def test_score_command(mock_fetch):
     result = runner.invoke(app, ["score", "BBCA"])
     assert result.exit_code == 0
 
@@ -68,48 +63,52 @@ def test_info_command():
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
-def test_compare_comma(mock_stocks, mock_fetch):
+def test_compare_comma(mock_fetch):
     result = runner.invoke(app, ["compare", "BBCA,BBRI"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
-def test_compare_space(mock_stocks, mock_fetch):
+def test_compare_space(mock_fetch):
     result = runner.invoke(app, ["compare", "BBCA", "BBRI"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
+@patch("app.cli.main.get_discovered_tickers", return_value=[
+    SymbolInfo(ticker="BBCA", name="PT Bank Central Asia Tbk.", sector="Financials"),
+    SymbolInfo(ticker="BBRI", name="PT Bank Rakyat Indonesia Tbk.", sector="Financials"),
+])
 def test_screen_command(mock_stocks, mock_fetch):
     result = runner.invoke(app, ["screen", "--limit", "3"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
+@patch("app.cli.main.get_discovered_tickers", return_value=[
+    SymbolInfo(ticker="BBCA", name="PT Bank Central Asia Tbk.", sector="Financials"),
+    SymbolInfo(ticker="BBRI", name="PT Bank Rakyat Indonesia Tbk.", sector="Financials"),
+])
 def test_gainers_command(mock_stocks, mock_fetch):
     result = runner.invoke(app, ["gainers"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
+@patch("app.cli.main.get_discovered_tickers", return_value=[
+    SymbolInfo(ticker="BBCA", name="PT Bank Central Asia Tbk.", sector="Financials"),
+    SymbolInfo(ticker="BBRI", name="PT Bank Rakyat Indonesia Tbk.", sector="Financials"),
+])
 def test_losers_command(mock_stocks, mock_fetch):
     result = runner.invoke(app, ["losers"])
     assert result.exit_code == 0
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-@patch("app.cli.main.get_all", return_value=[{"ticker": "BBCA", "name": "PT Bank Central Asia Tbk.", "sector": "Financials"},
-                                              {"ticker": "BBRI", "name": "PT Bank Rakyat Indonesia Tbk.", "sector": "Financials"}])
+@patch("app.cli.main.get_discovered_tickers", return_value=[
+    SymbolInfo(ticker="BBCA", name="PT Bank Central Asia Tbk.", sector="Financials"),
+    SymbolInfo(ticker="BBRI", name="PT Bank Rakyat Indonesia Tbk.", sector="Financials"),
+])
 def test_sector_command(mock_stocks, mock_fetch):
     result = runner.invoke(app, ["sector", "Financials"])
     assert result.exit_code == 0
