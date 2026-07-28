@@ -101,11 +101,11 @@ def bulk_screen(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     invalid = []
     failed = []
     with ThreadPoolExecutor(max_workers=2) as ex:
-        for r, err in ex.map(_fetch_and_screen, tickers):
+        for t, (r, err) in zip(tickers, ex.map(_fetch_and_screen, tickers)):
             if err == "not_found":
-                invalid.append(err)
+                invalid.append(t)
             elif err == "error":
-                failed.append(err)
+                failed.append(t)
             elif r:
                 results.append(r)
     return sorted(results, key=lambda r: r["max_confidence"], reverse=True), invalid, failed
@@ -145,6 +145,10 @@ def bulk_gainers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
 
 def bulk_losers(tickers: list[str]) -> tuple[list[dict], list[str], list[str]]:
     return _bulk_by_change(tickers, reverse=False)
+
+
+def health_summary() -> str:
+    return provider.health_summary()
 
 
 def _calc_change(data: StockData) -> str:
