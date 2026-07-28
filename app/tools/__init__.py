@@ -1,24 +1,11 @@
 from loguru import logger
+from app.tools.base import _classify_error
 from app.tools.cache import ProviderCache
 from app.tools.registry import ProviderRegistry
 from app.config.settings import settings
 from app.models.stock import StockData
 from app.models.symbol import SymbolInfo
 from app.validation import is_valid, normalize
-
-_RATE_LIMITED_PATTERNS = ["rate limit", "too many requests", "429"]
-_NOT_FOUND_PATTERNS = ["not found", "no data", "delisted", "404"]
-
-
-def _classify_error(e: Exception) -> str:
-    msg = str(e).lower()
-    for pat in _RATE_LIMITED_PATTERNS:
-        if pat in msg:
-            return "rate_limited"
-    for pat in _NOT_FOUND_PATTERNS:
-        if pat in msg:
-            return "not_found"
-    return "error"
 
 # side-effect imports: triggers ProviderRegistry.register() in each module
 import app.tools.yahoo_finance  # noqa: F401
@@ -87,7 +74,10 @@ class FallbackProvider:
     def list_symbols(self) -> list[SymbolInfo]:
         results = []
         for provider in self.providers:
-            results.extend(provider.list_symbols())
+            try:
+                results.extend(provider.list_symbols())
+            except Exception:
+                logger.warning(f"list_symbols gagal untuk {type(provider).__name__}, dilewati")
         return results
 
 

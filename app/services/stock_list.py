@@ -78,8 +78,7 @@ def get_discovered_tickers() -> list[SymbolInfo]:
 
     try:
         p = get_provider()
-        per_provider = [prov.list_symbols() for prov in p.providers]
-        symbols = merge_and_dedup(per_provider)
+        symbols = merge_and_dedup([p.list_symbols()])
         if symbols:
             try:
                 with open(cache_path, "w") as f:

@@ -1,5 +1,3 @@
-import json
-import os
 import time
 from datetime import date, datetime, timedelta
 import httpx
@@ -103,20 +101,24 @@ class IDXProvider(Provider):
         return {}
 
     def list_symbols(self) -> list[SymbolInfo]:
-        path = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
+        self._ensure_session()
         try:
-            with open(path) as f:
-                stocks = json.load(f)
+            raw = self._client.get(
+                "https://www.idx.co.id/primary/ListedCompany/GetStockList",
+            ).json()
+            if not raw:
+                return []
             result = []
-            for s in stocks:
+            for item in raw:
                 result.append(SymbolInfo(
-                    ticker=s.get("ticker", ""),
-                    name=s.get("name"),
-                    sector=s.get("sector"),
+                    ticker=item.get("KodeEmiten", ""),
+                    name=item.get("NamaEmiten"),
+                    sector=item.get("Sektor"),
                 ))
             return result
         except Exception as e:
-            logger.warning(f"IDX: gagal baca daftar emiten: {e}")
+            logger.warning(f"IDX: gagal ambil daftar emiten via API: {e}")
+            logger.warning("IDX: endpoint mungkin diblokir Cloudflare atau tidak tersedia. Pakai fallback discovery provider lain atau file statis.")
             return []
 
 
