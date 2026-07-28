@@ -4,6 +4,8 @@ import yfinance as yf
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.models.symbol import SymbolInfo
+from app.tools.base import Provider
+from app.tools.registry import ProviderRegistry
 
 
 _NOT_FOUND_PATTERNS = [
@@ -30,7 +32,7 @@ def _classify_error(e: Exception) -> str:
     return "error"
 
 
-class YahooFinanceProvider:
+class YahooFinanceProvider(Provider):
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         if ticker.upper() in _invalid_tickers:
             logger.debug(f"Skip {ticker}: already in invalid cache")
@@ -101,4 +103,4 @@ class YahooFinanceProvider:
         return []
 
 
-provider = YahooFinanceProvider()
+ProviderRegistry.register("yahoo", YahooFinanceProvider)

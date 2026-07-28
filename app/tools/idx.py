@@ -3,6 +3,8 @@ import httpx
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.models.symbol import SymbolInfo
+from app.tools.base import Provider
+from app.tools.registry import ProviderRegistry
 _BROWSER_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
@@ -11,7 +13,7 @@ _BROWSER_HEADERS = {
 }
 
 
-class IDXProvider:
+class IDXProvider(Provider):
     def __init__(self):
         self._client: httpx.Client | None = None
 
@@ -128,3 +130,6 @@ def _parse_period(period: str) -> date | None:
     if unit == "wk":
         return today - timedelta(weeks=n)
     return None
+
+
+ProviderRegistry.register("idx", IDXProvider)
