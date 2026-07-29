@@ -177,7 +177,7 @@
     "ticker": "ALKA",
     "name": "Alakasa Industrindo Tbk",
     "sector": "Basic Materials",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "ALMI",
@@ -1047,7 +1047,7 @@
     "ticker": "BSWD",
     "name": "Bank Of India Indonesia Tbk.",
     "sector": "Financial Services",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "BTEK",
@@ -3255,7 +3255,7 @@
     "ticker": "MASB",
     "name": "Bank Multiarta Sentosa Tbk.",
     "sector": "Financial Services",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "MAXI",
@@ -3567,7 +3567,7 @@
     "ticker": "MPRO",
     "name": "Maha Properti Indonesia Tbk.",
     "sector": "Real Estate",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "MPXL",
@@ -3777,7 +3777,7 @@
     "ticker": "NICK",
     "name": "Charnic Capital Tbk.",
     "sector": "Real Estate",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "NICL",
@@ -4437,7 +4437,7 @@
     "ticker": "RDTX",
     "name": "Roda Vivatex Tbk",
     "sector": "Real Estate",
-    "valid": false
+    "valid": true
   },
   {
     "ticker": "REAL",

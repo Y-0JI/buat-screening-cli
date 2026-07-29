@@ -1,38 +1,44 @@
 import time
 from datetime import date, datetime, timedelta
-import httpx
+from curl_cffi import requests as curl_requests
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.models.symbol import SymbolInfo
 from app.tools.base import Provider
 from app.tools.registry import ProviderRegistry
+
 _BROWSER_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
     "Referer": "https://www.idx.co.id/",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+    "Upgrade-Insecure-Requests": "1",
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    "X-Requested-With": "XMLHttpRequest",
 }
 
 
 class IDXProvider(Provider):
     def __init__(self):
-        self._client: httpx.Client | None = None
+        self._session: curl_requests.Session | None = None
 
     def _ensure_session(self):
-        if self._client is not None:
+        if self._session is not None:
             return
-        client = httpx.Client(headers=_BROWSER_HEADERS, follow_redirects=True)
-        client.get("https://www.idx.co.id/id")
-        client.get("https://www.idx.co.id/primary/home/GetIndexList")
-        self._client = client
+        session = curl_requests.Session()
+        session.headers.update(_BROWSER_HEADERS)
+        session.get("https://www.idx.co.id/id", impersonate="chrome131")
+        time.sleep(1)
+        session.get("https://www.idx.co.id/primary/home/GetIndexList", impersonate="chrome131")
+        self._session = session
 
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         self._ensure_session()
         for attempt in range(3):
             try:
-                raw = self._client.get(
+                raw = self._session.get(
                     "https://www.idx.co.id/primary/ListedCompany/GetTradingInfoSS",
                     params={"code": ticker, "start": 0, "length": 1000},
+                    impersonate="chrome131",
                 ).json()
                 if not raw or not raw.get("replies"):
                     logger.info(f"Data kosong untuk {ticker}")
@@ -68,8 +74,9 @@ class IDXProvider(Provider):
                 )
             except Exception as e:
                 if attempt < 2:
-                    logger.debug(f"Retry IDX {ticker} in {attempt+1}s (attempt {attempt+1}/3): {e}")
-                    time.sleep(attempt + 1)
+                    delay = min(1000 * 2 ** attempt, 15000) / 1000
+                    logger.debug(f"Retry IDX {ticker} in {delay}s (attempt {attempt+1}/3): {e}")
+                    time.sleep(delay)
                 else:
                     logger.warning(f"Gagal fetch IDX {ticker} setelah 3 percobaan: {e}")
         return None
@@ -77,9 +84,10 @@ class IDXProvider(Provider):
     def get_price(self, ticker: str) -> float | None:
         self._ensure_session()
         try:
-            raw = self._client.get(
+            raw = self._session.get(
                 "https://www.idx.co.id/primary/ListedCompany/GetTradingInfoDaily",
                 params={"code": ticker},
+                impersonate="chrome131",
             ).json()
             if raw and raw.get("ClosingPrice"):
                 return float(raw["ClosingPrice"])
@@ -89,9 +97,10 @@ class IDXProvider(Provider):
 
     def _fetch_meta(self, ticker: str) -> dict:
         try:
-            raw = self._client.get(
+            raw = self._session.get(
                 "https://www.idx.co.id/primary/ListedCompany/GetCompanyProfilesDetail",
                 params={"KodeEmiten": ticker, "language": "id-id"},
+                impersonate="chrome131",
             ).json()
             if raw and raw.get("Profiles") and len(raw["Profiles"]) > 0:
                 p = raw["Profiles"][0]
@@ -103,8 +112,9 @@ class IDXProvider(Provider):
     def list_symbols(self) -> list[SymbolInfo]:
         self._ensure_session()
         try:
-            raw = self._client.get(
+            raw = self._session.get(
                 "https://www.idx.co.id/primary/ListedCompany/GetStockList",
+                impersonate="chrome131",
             ).json()
             if not raw:
                 return []
@@ -141,7 +151,7 @@ def _parse_period(period: str) -> date | None:
         return None
     today = date.today()
     if unit == "mo":
-        return today - timedelta(days=n * 30)  # ponytail: ~30d month, fine for indicator window
+        return today - timedelta(days=n * 30)
     if unit == "d":
         return today - timedelta(days=n)
     if unit == "y":
