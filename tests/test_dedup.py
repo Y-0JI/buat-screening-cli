@@ -20,6 +20,13 @@ def test_merge_with_duplicates():
     assert len(result) == 3
 
 
+def test_merge_filters_invalid_format():
+    valid = [SymbolInfo(ticker="BBCA"), SymbolInfo(ticker="BBRI"), SymbolInfo(ticker="ADRO"), SymbolInfo(ticker="A2")]
+    invalid = [SymbolInfo(ticker=""), SymbolInfo(ticker="TOOLONGTICKER"), SymbolInfo(ticker="weird!"), SymbolInfo(ticker="abc 123")]
+    result = merge_and_dedup([valid + invalid])
+    assert [s.ticker for s in result] == ["BBCA", "BBRI", "ADRO", "A2"]
+
+
 def test_merge_empty():
     assert merge_and_dedup([[], []]) == []
     assert merge_and_dedup([]) == []
