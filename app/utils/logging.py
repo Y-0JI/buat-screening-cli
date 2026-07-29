@@ -4,7 +4,7 @@ from loguru import logger
 
 def _terminal_filter(record):
     if record["name"].startswith("app.tools"):
-        return record["level"].no > 30
+        return record["level"].no > 40
     return True
 
 
