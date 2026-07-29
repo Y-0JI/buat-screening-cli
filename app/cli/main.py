@@ -9,6 +9,16 @@ from app.services.stock_list import get_all, search, get_discovered_tickers, res
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.validate_universe import run as validate_run, last_validated_days
+from app.services.watchlist import (
+    create as wl_create,
+    rename as wl_rename,
+    delete as wl_delete,
+    list_all as wl_list,
+    get_by_id as wl_get,
+    add_symbol as wl_add,
+    remove_symbol as wl_remove,
+    reorder as wl_reorder,
+)
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
 
@@ -28,7 +38,7 @@ def _show_health():
 
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
-                   "losers", "sector", "stocks", "natural", "info", "chat", "research", "validate-universe"}
+                   "losers", "sector", "stocks", "natural", "info", "chat", "research", "validate-universe", "watchlist"}
 
 def _reroute_unknown_to_natural():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
@@ -253,6 +263,114 @@ def validate_universe(dry_run: bool = typer.Option(False, "--dry-run", help="Han
         validate_run(dry_run=dry_run)
 
 
+watchlist_cmd = typer.Typer()
+app.add_typer(watchlist_cmd, name="watchlist", help="Kelola watchlist saham")
+
+
+@watchlist_cmd.command()
+def create(name: str) -> None:
+    """Buat watchlist baru."""
+    try:
+        w = wl_create(name)
+        console.print(f"[green]✓[/green] Watchlist [bold]'{w.name}'[/bold] dibuat (id: {w.id})")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def rename(wl_id: str, new_name: str) -> None:
+    """Ganti nama watchlist."""
+    try:
+        w = wl_rename(wl_id, new_name)
+        console.print(f"[green]✓[/green] Watchlist diganti jadi [bold]'{w.name}'[/bold]")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def delete(wl_id: str) -> None:
+    """Hapus watchlist."""
+    try:
+        wl_delete(wl_id)
+        console.print(f"[green]✓[/green] Watchlist dihapus")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command(name="list")
+def list_() -> None:
+    """Tampilkan semua watchlist."""
+    watchlists = wl_list()
+    if not watchlists:
+        console.print("[yellow]Belum ada watchlist.[/yellow]")
+        return
+    from rich.table import Table
+    table = Table(title="Watchlist Saya")
+    table.add_column("No", style="dim")
+    table.add_column("ID")
+    table.add_column("Nama", style="bold")
+    table.add_column("Jumlah", justify="right")
+    table.add_column("Terakhir Diubah")
+    for i, w in enumerate(watchlists, 1):
+        table.add_row(str(i), w.id, w.name, str(len(w.entries)), w.updated_at[:10])
+    console.print(table)
+
+
+@watchlist_cmd.command()
+def show(wl_id: str) -> None:
+    """Tampilkan isi watchlist."""
+    try:
+        w = wl_get(wl_id)
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+        return
+    console.print(f"[bold]Watchlist:[/bold] {w.name}")
+    if not w.entries:
+        console.print("[dim]Kosong[/dim]")
+        return
+    from rich.table import Table
+    table = Table()
+    table.add_column("#", style="dim")
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Ditambahkan")
+    for e in w.entries:
+        table.add_row(str(e.position + 1), e.ticker, e.added_at[:10])
+    console.print(table)
+
+
+@watchlist_cmd.command()
+def add(wl_id: str, ticker: str) -> None:
+    """Tambah simbol ke watchlist."""
+    try:
+        w = wl_add(wl_id, ticker)
+        t = normalize(ticker)
+        console.print(f"[green]✓[/green] [cyan]{t}[/cyan] ditambahkan ke [bold]'{w.name}'[/bold]")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def remove(wl_id: str, ticker: str) -> None:
+    """Hapus simbol dari watchlist."""
+    try:
+        w = wl_remove(wl_id, ticker)
+        t = normalize(ticker)
+        console.print(f"[green]✓[/green] [cyan]{t}[/cyan] dihapus dari [bold]'{w.name}'[/bold]")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def reorder(wl_id: str, tickers: str) -> None:
+    """Ubah urutan simbol (pisah koma)."""
+    try:
+        ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
+        w = wl_reorder(wl_id, ticker_list)
+        console.print(f"[green]✓[/green] Urutan [bold]'{w.name}'[/bold] diperbarui")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
 @app.command()
 def info() -> None:
     console.print("[bold]Available commands:[/bold]")
@@ -269,6 +387,14 @@ def info() -> None:
     console.print('  "[query]"            - Bahasa natural (contoh: "BBCA" atau "analisa BBCA")')
     console.print("  research [query]     - Riset end-to-end (screening+analisis+perbandingan)")
     console.print("  validate-universe    - Validasi ulang daftar emiten via Yahoo Finance")
+    console.print("  watchlist create     - Buat watchlist baru")
+    console.print("  watchlist list       - Daftar semua watchlist")
+    console.print("  watchlist rename     - Ganti nama watchlist")
+    console.print("  watchlist delete     - Hapus watchlist")
+    console.print("  watchlist show       - Lihat isi watchlist")
+    console.print("  watchlist add        - Tambah simbol ke watchlist")
+    console.print("  watchlist remove     - Hapus simbol dari watchlist")
+    console.print("  watchlist reorder    - Ubah urutan simbol")
     console.print("  info                 - Bantuan ini")
 
 
