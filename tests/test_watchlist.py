@@ -1,6 +1,10 @@
 import json
 import os
-from app.services.watchlist import _DATA_PATH, create, rename, delete, list_all, get_by_id, add_symbol, remove_symbol, reorder
+from app.services.watchlist import (
+    _DATA_PATH, create, rename, delete, list_all, get_by_id,
+    add_symbol, remove_symbol, reorder,
+    set_description, add_tag, remove_tag, set_notes, toggle_favorite,
+)
 from app.models.watchlist import Watchlist
 
 
@@ -173,3 +177,137 @@ def test_default_watchlist_created():
     watchlists = list_all()
     assert len(watchlists) >= 1
     assert watchlists[0].name == "Watchlist Saya"
+
+
+def test_set_description():
+    _clean()
+    w = create("Test")
+    w2 = set_description(w.id, "Saham pilihan saya")
+    assert w2.description == "Saham pilihan saya"
+
+
+def test_set_description_empty():
+    _clean()
+    w = create("Test")
+    w2 = set_description(w.id, "")
+    assert w2.description == ""
+
+
+def test_add_tag():
+    _clean()
+    w = create("Test")
+    w2 = add_tag(w.id, "blue-chip")
+    assert "blue-chip" in w2.tags
+
+
+def test_add_tag_duplicate():
+    _clean()
+    w = create("Test")
+    add_tag(w.id, "blue-chip")
+    try:
+        add_tag(w.id, "blue-chip")
+        assert False, "should raise"
+    except ValueError:
+        pass
+
+
+def test_remove_tag():
+    _clean()
+    w = create("Test")
+    add_tag(w.id, "blue-chip")
+    add_tag(w.id, "dividen")
+    w2 = remove_tag(w.id, "blue-chip")
+    assert "blue-chip" not in w2.tags
+    assert "dividen" in w2.tags
+
+
+def test_remove_tag_not_found():
+    _clean()
+    w = create("Test")
+    try:
+        remove_tag(w.id, "nonexistent")
+        assert False, "should raise"
+    except ValueError:
+        pass
+
+
+def test_multiple_tags():
+    _clean()
+    w = create("Test")
+    add_tag(w.id, "a")
+    add_tag(w.id, "b")
+    add_tag(w.id, "c")
+    w2 = get_by_id(w.id)
+    assert sorted(w2.tags) == ["a", "b", "c"]
+
+
+def test_set_notes():
+    _clean()
+    w = create("Test")
+    w2 = set_notes(w.id, "Pantau terus")
+    assert w2.notes == "Pantau terus"
+
+
+def test_set_notes_empty():
+    _clean()
+    w = create("Test")
+    set_notes(w.id, "Catatan")
+    w2 = set_notes(w.id, "")
+    assert w2.notes == ""
+
+
+def test_toggle_favorite():
+    _clean()
+    w = create("Test")
+    assert not w.favorite
+    w2 = toggle_favorite(w.id)
+    assert w2.favorite
+    w3 = toggle_favorite(w.id)
+    assert not w3.favorite
+
+
+def test_metadata_independent_from_entries():
+    _clean()
+    w = create("Test")
+    set_description(w.id, "Deskripsi")
+    add_tag(w.id, "tag1")
+    set_notes(w.id, "Catatan")
+    toggle_favorite(w.id)
+    add_symbol(w.id, "BBCA")
+    w2 = get_by_id(w.id)
+    assert w2.description == "Deskripsi"
+    assert "tag1" in w2.tags
+    assert w2.notes == "Catatan"
+    assert w2.favorite
+    assert len(w2.entries) == 1
+
+
+def test_metadata_persistence():
+    _clean()
+    w = create("Test")
+    set_description(w.id, "Persisten")
+    add_tag(w.id, "tag-a")
+    set_notes(w.id, "Aman")
+    toggle_favorite(w.id)
+    w2 = get_by_id(w.id)
+    assert w2.description == "Persisten"
+    assert "tag-a" in w2.tags
+    assert w2.notes == "Aman"
+    assert w2.favorite
+
+
+def test_new_watchlist_has_default_metadata():
+    _clean()
+    w = create("Test")
+    assert w.description == ""
+    assert w.tags == []
+    assert w.notes == ""
+    assert not w.favorite
+
+
+def test_tag_case_sensitive():
+    _clean()
+    w = create("Test")
+    add_tag(w.id, "Blue-Chip")
+    w2 = add_tag(w.id, "blue-chip")
+    assert len(w2.tags) == 2

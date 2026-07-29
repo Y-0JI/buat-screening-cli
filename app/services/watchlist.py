@@ -126,6 +126,74 @@ def remove_symbol(wl_id: str, ticker: str) -> Watchlist:
     raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
+def set_description(wl_id: str, description: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        d["description"] = description
+        d["updated_at"] = _now()
+        _save(data)
+        return _to_model(d)
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def add_tag(wl_id: str, tag: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        tags = d.get("tags", [])
+        if tag in tags:
+            raise ValueError(f"Tag '{tag}' sudah ada")
+        tags.append(tag)
+        d["tags"] = tags
+        d["updated_at"] = _now()
+        _save(data)
+        return _to_model(d)
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def remove_tag(wl_id: str, tag: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        tags = d.get("tags", [])
+        if tag not in tags:
+            raise ValueError(f"Tag '{tag}' tidak ditemukan")
+        tags.remove(tag)
+        d["tags"] = tags
+        d["updated_at"] = _now()
+        _save(data)
+        return _to_model(d)
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def set_notes(wl_id: str, notes: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        d["notes"] = notes
+        d["updated_at"] = _now()
+        _save(data)
+        return _to_model(d)
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def toggle_favorite(wl_id: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        d["favorite"] = not d.get("favorite", False)
+        d["updated_at"] = _now()
+        _save(data)
+        return _to_model(d)
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
 def reorder(wl_id: str, tickers: list[str]) -> Watchlist:
     data = _load()
     for d in data:

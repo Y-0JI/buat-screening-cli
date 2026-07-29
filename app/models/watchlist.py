@@ -13,6 +13,10 @@ class WatchlistEntry(BaseModel):
 class Watchlist(BaseModel):
     id: str = ""
     name: str
+    description: str = ""
+    tags: list[str] = []
+    notes: str = ""
+    favorite: bool = False
     created_at: str = ""
     updated_at: str = ""
     entries: list[WatchlistEntry] = []

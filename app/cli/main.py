@@ -18,6 +18,11 @@ from app.services.watchlist import (
     add_symbol as wl_add,
     remove_symbol as wl_remove,
     reorder as wl_reorder,
+    set_description as wl_desc,
+    add_tag as wl_tag_add,
+    remove_tag as wl_tag_remove,
+    set_notes as wl_notes,
+    toggle_favorite as wl_fav,
 )
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
@@ -307,12 +312,15 @@ def list_() -> None:
     from rich.table import Table
     table = Table(title="Watchlist Saya")
     table.add_column("No", style="dim")
-    table.add_column("ID")
     table.add_column("Nama", style="bold")
+    table.add_column("Tag")
     table.add_column("Jumlah", justify="right")
+    table.add_column("Favorit")
     table.add_column("Terakhir Diubah")
     for i, w in enumerate(watchlists, 1):
-        table.add_row(str(i), w.id, w.name, str(len(w.entries)), w.updated_at[:10])
+        fav = "[yellow]★[/yellow]" if w.favorite else ""
+        tags = ", ".join(w.tags) if w.tags else ""
+        table.add_row(str(i), w.name, tags, str(len(w.entries)), fav, w.updated_at[:10])
     console.print(table)
 
 
@@ -324,7 +332,15 @@ def show(wl_id: str) -> None:
     except ValueError as e:
         console.print(f"[red]✗[/red] {e}")
         return
-    console.print(f"[bold]Watchlist:[/bold] {w.name}")
+    fav = "[yellow]★[/yellow]" if w.favorite else ""
+    console.print(f"[bold]Watchlist:[/bold] {w.name} {fav}")
+    if w.description:
+        console.print(f"[dim]Deskripsi:[/dim] {w.description}")
+    if w.tags:
+        console.print(f"[dim]Tags:[/dim] {', '.join(w.tags)}")
+    if w.notes:
+        console.print(f"[dim]Catatan:[/dim] {w.notes}")
+    console.print(f"[dim]Dibuat:[/dim] {w.created_at[:10]} | [dim]Diubah:[/dim] {w.updated_at[:10]}")
     if not w.entries:
         console.print("[dim]Kosong[/dim]")
         return
@@ -371,6 +387,57 @@ def reorder(wl_id: str, tickers: str) -> None:
         console.print(f"[red]✗[/red] {e}")
 
 
+@watchlist_cmd.command()
+def describe(wl_id: str, description: str) -> None:
+    """Atur deskripsi watchlist."""
+    try:
+        w = wl_desc(wl_id, description)
+        console.print(f"[green]✓[/green] Deskripsi [bold]'{w.name}'[/bold] diperbarui")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def tag(wl_id: str, tag: str) -> None:
+    """Tambah tag ke watchlist."""
+    try:
+        w = wl_tag_add(wl_id, tag)
+        console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] ditambahkan ke [bold]'{w.name}'[/bold]")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def untag(wl_id: str, tag: str) -> None:
+    """Hapus tag dari watchlist."""
+    try:
+        w = wl_tag_remove(wl_id, tag)
+        console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] dihapus dari [bold]'{w.name}'[/bold]")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def notes(wl_id: str, notes: str) -> None:
+    """Atur catatan watchlist."""
+    try:
+        w = wl_notes(wl_id, notes)
+        console.print(f"[green]✓[/green] Catatan [bold]'{w.name}'[/bold] diperbarui")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@watchlist_cmd.command()
+def favorite(wl_id: str) -> None:
+    """Tandai/hapus status favorit."""
+    try:
+        w = wl_fav(wl_id)
+        status = "[yellow]★[/yellow] favorit" if w.favorite else "bukan favorit"
+        console.print(f"[green]✓[/green] [bold]'{w.name}'[/bold] sekarang {status}")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
 @app.command()
 def info() -> None:
     console.print("[bold]Available commands:[/bold]")
@@ -395,6 +462,11 @@ def info() -> None:
     console.print("  watchlist add        - Tambah simbol ke watchlist")
     console.print("  watchlist remove     - Hapus simbol dari watchlist")
     console.print("  watchlist reorder    - Ubah urutan simbol")
+    console.print("  watchlist describe   - Atur deskripsi watchlist")
+    console.print("  watchlist tag        - Tambah tag")
+    console.print("  watchlist untag      - Hapus tag")
+    console.print("  watchlist notes      - Atur catatan watchlist")
+    console.print("  watchlist favorite   - Tandai/hapus favorit")
     console.print("  info                 - Bantuan ini")
 
 
