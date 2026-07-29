@@ -25,11 +25,33 @@ def test_merge_empty():
     assert merge_and_dedup([]) == []
 
 
-def test_list_symbols_empty():
+def test_list_symbols_yahoo():
     p = YahooFinanceProvider()
     assert p.list_symbols() == []
+
+
+def test_list_symbols_idx_success():
     p2 = IDXProvider()
-    assert p2.list_symbols() == []
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = [
+        {"KodeEmiten": "BBCA", "NamaEmiten": "Bank BCA", "Sektor": "Financials"},
+        {"KodeEmiten": "BBRI", "NamaEmiten": "Bank BRI", "Sektor": "Financials"},
+    ]
+    p2._client = MagicMock()
+    p2._client.get.return_value = mock_resp
+    symbols = p2.list_symbols()
+    assert len(symbols) == 2
+    assert symbols[0].ticker == "BBCA"
+    assert symbols[0].name == "Bank BCA"
+    assert symbols[1].sector == "Financials"
+
+
+def test_list_symbols_idx_api_error():
+    p2 = IDXProvider()
+    p2._client = MagicMock()
+    p2._client.get.side_effect = Exception("403 Forbidden")
+    symbols = p2.list_symbols()
+    assert symbols == []
 
 
 def test_fallback_list_symbols_empty():
@@ -39,3 +61,14 @@ def test_fallback_list_symbols_empty():
     p2.list_symbols.return_value = []
     fb = FallbackProvider([p1, p2], MagicMock())
     assert fb.list_symbols() == []
+
+
+def test_fallback_list_symbols_skip_failed():
+    p1 = MagicMock()
+    p1.list_symbols.side_effect = Exception("gagal")
+    p2 = MagicMock()
+    p2.list_symbols.return_value = [SymbolInfo(ticker="BBCA")]
+    fb = FallbackProvider([p1, p2], MagicMock())
+    symbols = fb.list_symbols()
+    assert len(symbols) == 1
+    assert symbols[0].ticker == "BBCA"

@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from app.tools.yahoo_finance import YahooFinanceProvider
+from app.services.stock_list import get_discovered_tickers
 
 _provider = YahooFinanceProvider()
 
@@ -46,10 +47,22 @@ def run(dry_run: bool = False) -> None:
     with open(_DATA_PATH) as f:
         stocks = json.load(f)
 
-    tickers = [s["ticker"] for s in stocks]
-    total = len(tickers)
     stocks_by_ticker = {s["ticker"]: s for s in stocks}
     changed = 0
+
+    discovered = get_discovered_tickers()
+    new_count = 0
+    for sym in discovered:
+        if sym.ticker not in stocks_by_ticker:
+            stocks_by_ticker[sym.ticker] = {"ticker": sym.ticker, "name": sym.name, "sector": sym.sector, "valid": True}
+            new_count += 1
+    if new_count:
+        print(f"Discovery: {new_count} emiten baru ditemukan", file=sys.stderr)
+        changed += new_count
+
+    stocks = list(stocks_by_ticker.values())
+    tickers = [s["ticker"] for s in stocks]
+    total = len(tickers)
     done = 0
     summary = {"valid": 0, "not_found": 0, "rate_limited": 0, "error": 0}
 

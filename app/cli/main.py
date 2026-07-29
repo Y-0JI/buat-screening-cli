@@ -5,7 +5,7 @@ from app.utils.logging import setup_logging
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers, health_summary as provider_health
-from app.services.stock_list import get_all, search
+from app.services.stock_list import get_all, search, get_discovered_tickers
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.validate_universe import run as validate_run, last_validated_days
@@ -122,7 +122,7 @@ def screen(
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
     _warn_universe_age()
-    tickers = [s["ticker"] for s in get_all()]
+    tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Screening saham..."):
         results, invalid, failed = bulk_screen(tickers)
     if sector:
@@ -143,7 +143,7 @@ def screen(
 @app.command()
 def gainers(limit: int = 10) -> None:
     _warn_universe_age()
-    tickers = [s["ticker"] for s in get_all()]
+    tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_gainers(tickers)
     _print_bulk_change(results[:limit], title="Top Gainers", invalid=invalid, failed=failed)
@@ -153,7 +153,7 @@ def gainers(limit: int = 10) -> None:
 @app.command()
 def losers(limit: int = 10) -> None:
     _warn_universe_age()
-    tickers = [s["ticker"] for s in get_all()]
+    tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_losers(tickers)
     _print_bulk_change(results[:limit], title="Top Losers", invalid=invalid, failed=failed)
@@ -163,7 +163,7 @@ def losers(limit: int = 10) -> None:
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
     _warn_universe_age()
-    tickers = [s["ticker"] for s in get_all()]
+    tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Screening saham sektor {name}..."):
         results, invalid, failed = bulk_screen(tickers)
     results = [r for r in results if r.get("sector") and name.lower() in r["sector"].lower()]

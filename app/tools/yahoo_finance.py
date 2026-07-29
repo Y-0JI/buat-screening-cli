@@ -4,32 +4,11 @@ import yfinance as yf
 from loguru import logger
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.models.symbol import SymbolInfo
-from app.tools.base import Provider
+from app.tools.base import Provider, _classify_error
 from app.tools.registry import ProviderRegistry
 
-
-_NOT_FOUND_PATTERNS = [
-    "possibly delisted",
-    "quote not found",
-    "http 404",
-    "no data found",
-    "no data available",
-    "symbol may be delisted",
-]
-_RATE_LIMITED_PATTERNS = ["rate limited", "too many requests", "429"]
 _last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
-
-
-def _classify_error(e: Exception) -> str:
-    msg = str(e).lower()
-    for pat in _RATE_LIMITED_PATTERNS:
-        if pat in msg:
-            return "rate_limited"
-    for pat in _NOT_FOUND_PATTERNS:
-        if pat in msg:
-            return "not_found"
-    return "error"
 
 
 class YahooFinanceProvider(Provider):
@@ -100,6 +79,7 @@ class YahooFinanceProvider(Provider):
         return None
 
     def list_symbols(self) -> list[SymbolInfo]:
+        """Yahoo Finance tidak punya endpoint daftar emiten IDX yang reliable."""
         return []
 
 

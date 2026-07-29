@@ -1,4 +1,5 @@
 from loguru import logger
+from app.tools.base import _classify_error
 from app.tools.cache import ProviderCache
 from app.tools.registry import ProviderRegistry
 from app.config.settings import settings
@@ -17,7 +18,7 @@ class FallbackProvider:
         self.cache = cache
         self._stats: dict[str, dict] = {}
         for p in providers:
-            self._stats[type(p).__name__] = {"ok": 0, "fail": 0, "rate_limited": 0}
+            self._stats[type(p).__name__] = {"ok": 0, "fail": 0, "rate_limited": 0, "not_found": 0, "error": 0}
 
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
         ticker = normalize(ticker)
@@ -36,8 +37,9 @@ class FallbackProvider:
                 logger.warning(f"{name}: no data for {ticker}")
                 self._stats[name]["fail"] += 1
             except Exception as e:
-                logger.warning(f"{name}: failed for {ticker}: {e}")
-                self._stats[name]["rate_limited"] += 1
+                kind = _classify_error(e)
+                logger.warning(f"{name}: {kind} for {ticker}: {e}")
+                self._stats[name][kind] += 1
         cached = self.cache.load(ticker, period, need_profile, allow_stale=True)
         if cached:
             logger.warning(f"All providers failed for {ticker}, returning stale cache")
@@ -48,7 +50,12 @@ class FallbackProvider:
     def health_summary(self) -> str:
         lines = []
         for name, c in self._stats.items():
-            lines.append(f"{name}: ok={c['ok']}, fail={c['fail']}, rate_limited={c['rate_limited']}")
+            parts = [f"ok={c['ok']}", f"fail={c['fail']}", f"rate_limited={c['rate_limited']}"]
+            if c.get("not_found"):
+                parts.append(f"not_found={c['not_found']}")
+            if c.get("error"):
+                parts.append(f"error={c['error']}")
+            lines.append(f"{name}: {', '.join(parts)}")
         return "\n".join(lines)
 
     def get_price(self, ticker: str) -> float | None:
@@ -67,7 +74,10 @@ class FallbackProvider:
     def list_symbols(self) -> list[SymbolInfo]:
         results = []
         for provider in self.providers:
-            results.extend(provider.list_symbols())
+            try:
+                results.extend(provider.list_symbols())
+            except Exception:
+                logger.warning(f"list_symbols gagal untuk {type(provider).__name__}, dilewati")
         return results
 
 

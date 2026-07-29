@@ -1,3 +1,4 @@
+import time
 from datetime import date, datetime, timedelta
 import httpx
 from loguru import logger
@@ -100,7 +101,25 @@ class IDXProvider(Provider):
         return {}
 
     def list_symbols(self) -> list[SymbolInfo]:
-        return []
+        self._ensure_session()
+        try:
+            raw = self._client.get(
+                "https://www.idx.co.id/primary/ListedCompany/GetStockList",
+            ).json()
+            if not raw:
+                return []
+            result = []
+            for item in raw:
+                result.append(SymbolInfo(
+                    ticker=item.get("KodeEmiten", ""),
+                    name=item.get("NamaEmiten"),
+                    sector=item.get("Sektor"),
+                ))
+            return result
+        except Exception as e:
+            logger.warning(f"IDX: gagal ambil daftar emiten via API: {e}")
+            logger.warning("IDX: endpoint mungkin diblokir Cloudflare atau tidak tersedia. Pakai fallback discovery provider lain atau file statis.")
+            return []
 
 
 def _parse_date(s: str) -> date | None:
