@@ -6,6 +6,11 @@ from pydantic import BaseModel
 
 class WatchlistEntry(BaseModel):
     ticker: str
+    name: str = ""
+    sector: str = ""
+    exchange: str = ""
+    industry: str = ""
+    currency: str = ""
     added_at: str = ""
     position: int = 0
 

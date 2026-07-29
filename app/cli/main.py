@@ -348,9 +348,11 @@ def show(wl_id: str) -> None:
     table = Table()
     table.add_column("#", style="dim")
     table.add_column("Ticker", style="cyan")
+    table.add_column("Nama")
+    table.add_column("Sektor")
     table.add_column("Ditambahkan")
     for e in w.entries:
-        table.add_row(str(e.position + 1), e.ticker, e.added_at[:10])
+        table.add_row(str(e.position + 1), e.ticker, e.name or "", e.sector or "", e.added_at[:10])
     console.print(table)
 
 

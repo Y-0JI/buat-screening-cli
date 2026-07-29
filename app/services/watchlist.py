@@ -6,6 +6,20 @@ from app.models.watchlist import Watchlist, WatchlistEntry
 from app.validation import normalize
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "watchlists.json")
+_STOCKS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
+
+
+def _stock_metadata(ticker: str) -> dict:
+    t = normalize(ticker)
+    try:
+        with open(_STOCKS_PATH) as f:
+            stocks = json.load(f)
+        for s in stocks:
+            if s["ticker"] == t:
+                return {"name": s.get("name", ""), "sector": s.get("sector", "")}
+    except Exception:
+        pass
+    return {"name": "", "sector": ""}
 
 
 def _load() -> list[dict]:
@@ -99,8 +113,9 @@ def add_symbol(wl_id: str, ticker: str) -> Watchlist:
         existing = {e["ticker"] for e in d["entries"]}
         if t in existing:
             raise ValueError(f"'{t}' sudah ada di watchlist")
+        meta = _stock_metadata(t)
         pos = len(d["entries"])
-        entry = WatchlistEntry(ticker=t, added_at=_now(), position=pos)
+        entry = WatchlistEntry(ticker=t, name=meta["name"], sector=meta["sector"], added_at=_now(), position=pos)
         d["entries"].append(entry.model_dump())
         d["updated_at"] = _now()
         _save(data)

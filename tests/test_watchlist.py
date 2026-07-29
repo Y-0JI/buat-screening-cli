@@ -311,3 +311,65 @@ def test_tag_case_sensitive():
     add_tag(w.id, "Blue-Chip")
     w2 = add_tag(w.id, "blue-chip")
     assert len(w2.tags) == 2
+
+
+def test_symbol_metadata_populated():
+    _clean()
+    w = create("Test")
+    w2 = add_symbol(w.id, "BBCA")
+    e = w2.entries[0]
+    assert e.ticker == "BBCA"
+    assert e.name
+    assert "Financial" in e.sector
+
+
+def test_symbol_metadata_unknown_ticker():
+    _clean()
+    w = create("Test")
+    w2 = add_symbol(w.id, "ZZZZ")
+    e = w2.entries[0]
+    assert e.ticker == "ZZZZ"
+    assert e.name == ""
+    assert e.sector == ""
+
+
+def test_symbol_metadata_persisted():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBRI")
+    w2 = get_by_id(w.id)
+    e = w2.entries[0]
+    assert e.name
+    assert "Financial" in e.sector
+
+
+def test_symbol_metadata_multiple_symbols():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    add_symbol(w.id, "TLKM")
+    w2 = get_by_id(w.id)
+    names = {e.ticker: e.name for e in w2.entries}
+    assert names["BBCA"]
+    assert names["ADRO"]
+    assert names["TLKM"]
+
+
+def test_symbol_metadata_updated_at_add():
+    _clean()
+    w = create("Test")
+    w2 = add_symbol(w.id, "BBCA")
+    e = w2.entries[0]
+    assert e.added_at
+    assert e.position == 0
+
+
+def test_add_symbol_preserves_existing_entries():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    w2 = add_symbol(w.id, "BBRI")
+    assert len(w2.entries) == 2
+    assert w2.entries[0].ticker == "BBCA"
+    assert w2.entries[1].ticker == "BBRI"
