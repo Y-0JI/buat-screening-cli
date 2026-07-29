@@ -37,8 +37,8 @@ def test_list_symbols_idx_success():
         {"KodeEmiten": "BBCA", "NamaEmiten": "Bank BCA", "Sektor": "Financials"},
         {"KodeEmiten": "BBRI", "NamaEmiten": "Bank BRI", "Sektor": "Financials"},
     ]
-    p2._client = MagicMock()
-    p2._client.get.return_value = mock_resp
+    p2._session = MagicMock()
+    p2._session.get.return_value = mock_resp
     symbols = p2.list_symbols()
     assert len(symbols) == 2
     assert symbols[0].ticker == "BBCA"
@@ -48,8 +48,8 @@ def test_list_symbols_idx_success():
 
 def test_list_symbols_idx_api_error():
     p2 = IDXProvider()
-    p2._client = MagicMock()
-    p2._client.get.side_effect = Exception("403 Forbidden")
+    p2._session = MagicMock()
+    p2._session.get.side_effect = Exception("403 Forbidden")
     symbols = p2.list_symbols()
     assert symbols == []
 

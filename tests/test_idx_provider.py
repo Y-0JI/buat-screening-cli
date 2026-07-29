@@ -17,10 +17,10 @@ def _d(offset):
     return (_today() - timedelta(days=offset)).isoformat()
 
 
-def _mock_client(history_data=None, meta_data=None, daily_data=None):
-    client = MagicMock()
+def _mock_session(history_data=None, meta_data=None, daily_data=None):
+    session = MagicMock()
 
-    def get_side_effect(url, params=None):
+    def get_side_effect(url, params=None, **kwargs):
         resp = MagicMock()
         if "GetTradingInfoSS" in url:
             resp.json.return_value = history_data or {}
@@ -32,12 +32,12 @@ def _mock_client(history_data=None, meta_data=None, daily_data=None):
             resp.json.return_value = {}
         return resp
 
-    client.get.side_effect = get_side_effect
-    return client
+    session.get.side_effect = get_side_effect
+    return session
 
 
 def test_fetch_success(provider):
-    client = _mock_client(
+    session = _mock_session(
         history_data={
             "replies": [
                 {"Date": _d(5), "OpenPrice": 1000, "High": 1010, "Low": 990, "Close": 1005, "Volume": 1000000},
@@ -46,7 +46,7 @@ def test_fetch_success(provider):
         },
         meta_data={"Profiles": [{"NamaEmiten": "Bank Central Asia Tbk", "Sektor": "Financials"}]},
     )
-    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+    with patch.object(provider, "_session", session):
         result = provider.fetch("BBCA")
 
     assert result is not None
@@ -59,29 +59,29 @@ def test_fetch_success(provider):
 
 
 def test_fetch_empty_replies(provider):
-    client = _mock_client(history_data={"replies": []})
-    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+    session = _mock_session(history_data={"replies": []})
+    with patch.object(provider, "_session", session):
         result = provider.fetch("BBCA")
     assert result is None
 
 
 def test_fetch_no_replies_key(provider):
-    client = _mock_client(history_data={})
-    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+    session = _mock_session(history_data={})
+    with patch.object(provider, "_session", session):
         result = provider.fetch("BBCA")
     assert result is None
 
 
 def test_get_price(provider):
-    client = _mock_client(daily_data={"ClosingPrice": 1005.0})
-    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+    session = _mock_session(daily_data={"ClosingPrice": 1005.0})
+    with patch.object(provider, "_session", session):
         price = provider.get_price("BBCA")
     assert price == 1005.0
 
 
 def test_get_price_no_data(provider):
-    client = _mock_client(daily_data={})
-    with patch.object(provider, "_client", client), patch.object(provider, "_ensure_session"):
+    session = _mock_session(daily_data={})
+    with patch.object(provider, "_session", session):
         price = provider.get_price("BBCA")
     assert price is None
 
