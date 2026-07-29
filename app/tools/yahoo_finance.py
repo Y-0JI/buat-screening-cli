@@ -1,7 +1,10 @@
+import logging
 import random
 import time
 import yfinance as yf
 from loguru import logger
+
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
 from app.models.stock import HistoricalPrice, StockData, StockInfo
 from app.models.symbol import SymbolInfo
 from app.tools.base import Provider, _classify_error

@@ -44,7 +44,7 @@ class FallbackProvider:
         if cached:
             logger.warning(f"All providers failed for {ticker}, returning stale cache")
             return cached
-        logger.error(f"All providers failed for {ticker}, no cache available")
+        logger.warning(f"All providers failed for {ticker}, no cache available")
         return None
 
     def health_summary(self) -> str:
