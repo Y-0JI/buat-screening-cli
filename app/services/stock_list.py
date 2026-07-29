@@ -5,7 +5,7 @@ from dataclasses import asdict
 from loguru import logger
 from app.models.symbol import SymbolInfo
 from app.tools import get_provider
-from app.validation import normalize
+from app.validation import is_valid, normalize
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
 _DISCOVERY_CACHE = os.path.join(os.path.dirname(__file__), "..", "data", "discovery_cache.json")
@@ -58,7 +58,7 @@ def merge_and_dedup(sources: list[list[SymbolInfo]]) -> list[SymbolInfo]:
     for symbols in sources:
         for sym in symbols:
             t = normalize(sym.ticker) if sym.ticker else ""
-            if not t:
+            if not t or not is_valid(t):
                 continue
             if t not in seen:
                 seen[t] = sym
