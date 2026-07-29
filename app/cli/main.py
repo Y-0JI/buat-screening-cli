@@ -5,7 +5,7 @@ from app.utils.logging import setup_logging
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers, health_summary as provider_health
-from app.services.stock_list import get_all, search, get_discovered_tickers
+from app.services.stock_list import get_all, search, get_discovered_tickers, resolve_name
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
 from app.services.validate_universe import run as validate_run, last_validated_days
@@ -122,11 +122,15 @@ def screen(
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
     _warn_universe_age()
-    tickers = [s.ticker for s in get_discovered_tickers()]
+    symbols = get_discovered_tickers()
+    if sector:
+        symbols = [s for s in symbols if s.sector and sector.lower() in s.sector.lower()]
+    if not symbols:
+        _p.info(f"Tidak ada saham {'di sektor ' + sector if sector else ''}")
+        return
+    tickers = [s.ticker for s in symbols]
     with console.status(f"[bold blue]Screening saham..."):
         results, invalid, failed = bulk_screen(tickers)
-    if sector:
-        results = [r for r in results if r.get("sector") and sector.lower() in r["sector"].lower()]
     if limit:
         results = results[:limit]
     if not results:
@@ -163,10 +167,13 @@ def losers(limit: int = 10) -> None:
 @app.command()
 def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -> None:
     _warn_universe_age()
-    tickers = [s.ticker for s in get_discovered_tickers()]
+    symbols = [s for s in get_discovered_tickers() if s.sector and name.lower() in s.sector.lower()]
+    if not symbols:
+        _p.info(f"Tidak ada saham di sektor {name}")
+        return
+    tickers = [s.ticker for s in symbols]
     with console.status(f"[bold blue]Screening saham sektor {name}..."):
         results, invalid, failed = bulk_screen(tickers)
-    results = [r for r in results if r.get("sector") and name.lower() in r["sector"].lower()]
     if not results:
         _p.info(f"Tidak ada sinyal screening di sektor {name}")
         if invalid:
@@ -285,7 +292,7 @@ def _print_bulk_screening(results: list[dict], title: str = "Hasil Screening", i
         ts = r["top_signal"]
         signal_style = "green" if ts.signal == "BUY" else "red" if ts.signal == "SELL" else "yellow"
         table.add_row(
-            r["ticker"], r.get("name", "")[:25], (r.get("sector") or "")[:15],
+            r["ticker"], r.get("name", r["ticker"]), r.get("sector") or "",
             f"{r.get('price', 0):,.0f}", f"[{signal_style}]{ts.signal}[/{signal_style}]", f"{ts.confidence:.0%}",
         )
     console.print(table)
@@ -307,12 +314,13 @@ def _print_bulk_change(results: list[dict], title: str = "Top", invalid: list[st
     table = Table(title=title)
     table.add_column("#", style="dim")
     table.add_column("Ticker", style="cyan")
+    table.add_column("Nama")
     table.add_column("Harga")
     table.add_column("Perubahan")
     for i, r in enumerate(results, 1):
         change = r.get("change", 0)
         style = "green" if change >= 0 else "red"
-        table.add_row(str(i), r["ticker"], f"{r['price']:,.0f}", f"[{style}]{change:+.2f}%[/{style}]")
+        table.add_row(str(i), r["ticker"], resolve_name(r["ticker"]) or r["ticker"], f"{r['price']:,.0f}", f"[{style}]{change:+.2f}%[/{style}]")
     console.print(table)
     if invalid:
         console.print(f"[dim]{len(invalid)} ticker tidak ditemukan[/dim]")
