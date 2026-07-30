@@ -68,30 +68,42 @@ def _test_backend(backend: StorageBackend):
 
 
 def test_local_json():
-    backend = LocalJsonStorage()
-    _test_backend(backend)
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        backend = LocalJsonStorage(path=path)
+        _test_backend(backend)
+    finally:
+        os.unlink(path)
 
 
 def test_sqlite():
-    backend = SqliteStorage()
-    _test_backend(backend)
-    db_path = backend._get_conn().execute("PRAGMA database_list").fetchone()[2]
-    backend._conn.close()
-    os.unlink(db_path)
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        backend = SqliteStorage(path=path)
+        _test_backend(backend)
+    finally:
+        os.unlink(path)
 
 
 def test_both_backends_produce_same_result():
-    wl = _sample_data()
-    json_backend = LocalJsonStorage()
-    sql_backend = SqliteStorage()
-    for backend in (json_backend, sql_backend):
-        backend.save(wl)
-        loaded = backend.load()
-        assert len(loaded) == 2
-        assert loaded[0]["entries"][0]["ticker"] == "BBCA"
-        assert loaded[1]["entries"] == []
-    json_backend.save([])
-    sql_backend.save([])
-    db_path = sql_backend._get_conn().execute("PRAGMA database_list").fetchone()[2]
-    sql_backend._conn.close()
-    os.unlink(db_path)
+    fd1, path1 = tempfile.mkstemp(suffix=".json")
+    os.close(fd1)
+    fd2, path2 = tempfile.mkstemp(suffix=".db")
+    os.close(fd2)
+    try:
+        wl = _sample_data()
+        json_backend = LocalJsonStorage(path=path1)
+        sql_backend = SqliteStorage(path=path2)
+        for backend in (json_backend, sql_backend):
+            backend.save(wl)
+            loaded = backend.load()
+            assert len(loaded) == 2
+            assert loaded[0]["entries"][0]["ticker"] == "BBCA"
+            assert loaded[1]["entries"] == []
+        json_backend.save([])
+        sql_backend.save([])
+    finally:
+        os.unlink(path1)
+        os.unlink(path2)

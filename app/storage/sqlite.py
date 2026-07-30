@@ -39,6 +39,7 @@ class SqliteStorage(StorageBackend):
                 exchange TEXT DEFAULT '',
                 industry TEXT DEFAULT '',
                 currency TEXT DEFAULT '',
+                market TEXT DEFAULT '',
                 valid INTEGER DEFAULT 1,
                 last_synced TEXT DEFAULT '',
                 added_at TEXT DEFAULT '',
@@ -88,13 +89,14 @@ class SqliteStorage(StorageBackend):
     def _save_entry(self, conn: sqlite3.Connection, entry: dict, wl_id: str) -> None:
         conn.execute(
             """INSERT OR REPLACE INTO entries
-            (ticker, name, sector, exchange, industry, currency,
+            (ticker, name, sector, exchange, industry, currency, market,
              valid, last_synced, added_at, position, watchlist_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 entry["ticker"], entry.get("name", ""), entry.get("sector", ""),
                 entry.get("exchange", ""), entry.get("industry", ""),
-                entry.get("currency", ""), int(entry.get("valid", True)),
+                entry.get("currency", ""), entry.get("market", ""),
+                int(entry.get("valid", True)),
                 entry.get("last_synced", ""), entry.get("added_at", ""),
                 entry.get("position", 0), wl_id,
             ),
@@ -111,17 +113,24 @@ class SqliteStorage(StorageBackend):
         conn.commit()
 
     def save(self, data: list[dict]) -> None:
-        """Incremental: hanya update/insert, tidak hapus data di luar data yang diberikan."""
         conn = self._get_conn()
-        existing_ids = {row[0] for row in conn.execute("SELECT id FROM watchlists").fetchall()}
+        existing = self.load()
+        existing_by_id = {wl["id"]: wl for wl in existing}
         new_ids = {wl["id"] for wl in data}
+
+        def _key(wl):
+            return json.dumps(wl, sort_keys=True, default=str)
+
         for wl in data:
+            old = existing_by_id.get(wl["id"])
+            if old is not None and _key(old) == _key(wl):
+                continue
             self._save_watchlist(conn, wl)
-            if wl["id"] in existing_ids:
-                conn.execute("DELETE FROM entries WHERE watchlist_id = ?", (wl["id"],))
+            conn.execute("DELETE FROM entries WHERE watchlist_id = ?", (wl["id"],))
             for e in wl.get("entries", []):
                 self._save_entry(conn, e, wl["id"])
-        unused_ids = existing_ids - new_ids
+
+        unused_ids = set(existing_by_id) - new_ids
         for uid in unused_ids:
             conn.execute("DELETE FROM entries WHERE watchlist_id = ?", (uid,))
             conn.execute("DELETE FROM watchlists WHERE id = ?", (uid,))

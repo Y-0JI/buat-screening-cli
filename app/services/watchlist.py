@@ -332,6 +332,7 @@ def _fetch_live_metadata(ticker: str) -> dict | None:
                 "industry": info.industry or "",
                 "exchange": info.exchange or "",
                 "currency": info.currency or "",
+                "market": info.market or "",
                 "valid": True,
             }
     except Exception:
@@ -339,13 +340,13 @@ def _fetch_live_metadata(ticker: str) -> dict | None:
     return None
 
 
-def _sync_entry(entry: dict, stock_index: dict[str, dict], live: bool = False) -> bool:
+def _sync_entry(entry: dict, stock_index: dict[str, dict], live: bool = True) -> bool:
     t = entry["ticker"]
     changed = False
     if live:
         live_meta = _fetch_live_metadata(t)
         if live_meta is not None:
-            for field in ("name", "sector", "industry", "exchange", "currency"):
+            for field in ("name", "sector", "industry", "exchange", "currency", "market"):
                 new_val = live_meta.get(field, "")
                 if entry.get(field) != new_val:
                     entry[field] = new_val
@@ -380,7 +381,7 @@ def _sync_entry(entry: dict, stock_index: dict[str, dict], live: bool = False) -
     return changed
 
 
-def refresh_metadata(wl_id: str, live: bool = False) -> Watchlist:
+def refresh_metadata(wl_id: str, live: bool = True) -> Watchlist:
     data = _load()
     stock_index = _load_stocks_index()
     for d in data:
@@ -396,7 +397,7 @@ def refresh_metadata(wl_id: str, live: bool = False) -> Watchlist:
     raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
-def refresh_all(live: bool = False) -> list[dict]:
+def refresh_all(live: bool = True) -> list[dict]:
     data = _load()
     data = _ensure_default(data)
     stock_index = _load_stocks_index()

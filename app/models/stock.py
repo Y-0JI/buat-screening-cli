@@ -17,6 +17,7 @@ class StockInfo(BaseModel):
     sector: str | None = None
     industry: str | None = None
     exchange: str | None = None
+    market: str | None = None
     market_cap: float | None = None
     currency: str = "IDR"
 

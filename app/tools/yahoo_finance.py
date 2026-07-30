@@ -34,6 +34,7 @@ class YahooFinanceProvider(Provider):
                         sector=info.get("sector"),
                         industry=info.get("industry"),
                         exchange=info.get("exchange"),
+                        market=info.get("market"),
                         market_cap=info.get("marketCap"),
                         currency=info.get("currency", "IDR"),
                     )

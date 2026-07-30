@@ -486,15 +486,14 @@ def favorite(wl_id: str) -> None:
 @watchlist_cmd.command()
 def sync(
     wl_id: str = typer.Argument("", help="ID watchlist (kosongkan untuk semua)"),
-    live: bool = typer.Option(False, "--live", "-l", help="Gunakan data live dari Yahoo Finance"),
 ) -> None:
     """Sinkronkan metadata simbol dengan data terbaru."""
     try:
         if wl_id:
-            w = wl_sync(wl_id, live=live)
+            w = wl_sync(wl_id)
             console.print(f"[green]✓[/green] [bold]'{w.name}'[/bold] disinkronkan ({len(w.entries)} simbol)")
         else:
-            results = wl_sync_all(live=live)
+            results = wl_sync_all()
             total = sum(r["changed"] for r in results)
             console.print(f"[green]✓[/green] {len(results)} watchlist disinkronkan ({total} perubahan)")
     except ValueError as e:
