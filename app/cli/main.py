@@ -25,6 +25,9 @@ from app.services.watchlist import (
     toggle_favorite as wl_fav,
     refresh_metadata as wl_sync,
     refresh_all as wl_sync_all,
+    query_entries as wl_query,
+    find_symbol as wl_find,
+    search_watchlists as wl_search,
 )
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
@@ -305,9 +308,16 @@ def delete(wl_id: str) -> None:
 
 
 @watchlist_cmd.command(name="list")
-def list_() -> None:
-    """Tampilkan semua watchlist."""
-    watchlists = wl_list()
+def list_(
+    name: str = typer.Option("", "--name", "-n", help="Cari nama watchlist"),
+    tag: str = typer.Option("", "--tag", "-t", help="Filter tag"),
+    favorite: bool = typer.Option(None, "--favorite", "-f", help="Filter favorit"),
+) -> None:
+    """Tampilkan semua watchlist dengan opsi filter."""
+    if name or tag or favorite is not None:
+        watchlists = wl_search(name=name, tag=tag, favorite=favorite)
+    else:
+        watchlists = wl_list()
     if not watchlists:
         console.print("[yellow]Belum ada watchlist.[/yellow]")
         return
@@ -326,11 +336,39 @@ def list_() -> None:
     console.print(table)
 
 
+def _show_entries_table(entries, title=""):
+    if not entries:
+        console.print("[dim]Tidak ada hasil[/dim]")
+        return
+    from rich.table import Table
+    table = Table(title=title)
+    table.add_column("#", style="dim")
+    table.add_column("Ticker", style="cyan")
+    table.add_column("Nama")
+    table.add_column("Sektor")
+    table.add_column("Status")
+    table.add_column("Ditambahkan")
+    for i, e in enumerate(entries, 1):
+        status = "[green]Aktif[/green]" if e.valid else "[red]Tidak Aktif[/red]"
+        table.add_row(str(i), e.ticker, e.name or "", e.sector or "", status, e.added_at[:10])
+    console.print(table)
+
+
 @watchlist_cmd.command()
-def show(wl_id: str) -> None:
-    """Tampilkan isi watchlist."""
+def show(
+    wl_id: str,
+    search: str = typer.Option("", "--search", "-s", help="Cari ticker/nama"),
+    sector: str = typer.Option("", "--sector", help="Filter sektor"),
+    valid: bool = typer.Option(None, "--valid", "--aktif", help="Filter status aktif"),
+    sort: str = typer.Option("", "--sort", help="Urutkan (ticker/name/sector/added_at)"),
+    reverse: bool = typer.Option(False, "--reverse", "-r", help="Urutan terbalik"),
+) -> None:
+    """Tampilkan isi watchlist dengan opsi cari, filter, urut."""
     try:
-        w = wl_get(wl_id)
+        if search or sector or valid is not None or sort:
+            w = wl_query(wl_id, search=search, sector=sector, valid=valid, sort_by=sort, sort_reverse=reverse)
+        else:
+            w = wl_get(wl_id)
     except ValueError as e:
         console.print(f"[red]✗[/red] {e}")
         return
@@ -343,21 +381,22 @@ def show(wl_id: str) -> None:
     if w.notes:
         console.print(f"[dim]Catatan:[/dim] {w.notes}")
     console.print(f"[dim]Dibuat:[/dim] {w.created_at[:10]} | [dim]Diubah:[/dim] {w.updated_at[:10]}")
-    if not w.entries:
-        console.print("[dim]Kosong[/dim]")
+    _show_entries_table(w.entries)
+
+
+@watchlist_cmd.command()
+def find(
+    query: str,
+    sort: str = typer.Option("", "--sort", help="Urutkan (ticker/name/sector)"),
+) -> None:
+    """Cari simbol di seluruh watchlist."""
+    results = wl_find(query)
+    if not results:
+        console.print(f"[yellow]Tidak ada hasil untuk '{query}'[/yellow]")
         return
-    from rich.table import Table
-    table = Table()
-    table.add_column("#", style="dim")
-    table.add_column("Ticker", style="cyan")
-    table.add_column("Nama")
-    table.add_column("Sektor")
-    table.add_column("Status")
-    table.add_column("Ditambahkan")
-    for e in w.entries:
-        status = "[green]Aktif[/green]" if e.valid else "[red]Tidak Aktif[/red]"
-        table.add_row(str(e.position + 1), e.ticker, e.name or "", e.sector or "", status, e.added_at[:10])
-    console.print(table)
+    for r in results:
+        label = f"{r['name']} ({len(r['entries'])} simbol)"
+        _show_entries_table(r["entries"], title=label)
 
 
 @watchlist_cmd.command()
@@ -489,7 +528,13 @@ def info() -> None:
     console.print("  watchlist notes      - Atur catatan watchlist")
     console.print("  watchlist favorite   - Tandai/hapus favorit")
     console.print("  watchlist sync       - Sinkronkan metadata simbol")
-    console.print("  info                 - Bantuan ini")
+    console.print('  watchlist show --search [q]   - Cari simbol (contoh: --search bank)')
+    console.print('  watchlist show --sector [s]   - Filter sektor (contoh: --sector Energy)')
+    console.print('  watchlist show --sort [f]     - Urutkan (ticker/name/sector/added_at)')
+    console.print('  watchlist list --tag [t]      - Filter watchlist by tag')
+    console.print('  watchlist list --favorite     - Filter watchlist favorit')
+    console.print("  watchlist find [q]     - Cari simbol di seluruh watchlist")
+    console.print("  info                   - Bantuan ini")
 
 
 def _print_bulk_screening(results: list[dict], title: str = "Hasil Screening", invalid: list[str] | None = None, failed: list[str] | None = None) -> None:

@@ -235,6 +235,67 @@ def reorder(wl_id: str, tickers: list[str]) -> Watchlist:
     raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
+_SORT_FIELDS = {"ticker", "name", "sector", "added_at", "position"}
+
+
+def query_entries(
+    wl_id: str,
+    search: str = "",
+    sector: str = "",
+    valid: bool | None = None,
+    sort_by: str = "",
+    sort_reverse: bool = False,
+) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        entries = [WatchlistEntry(**e) for e in d["entries"]]
+        if search:
+            q = search.lower()
+            entries = [e for e in entries if q in e.ticker.lower() or q in e.name.lower()]
+        if sector:
+            s = sector.lower()
+            entries = [e for e in entries if s in e.sector.lower()]
+        if valid is not None:
+            entries = [e for e in entries if e.valid == valid]
+        if sort_by in _SORT_FIELDS:
+            reverse = sort_reverse
+            if sort_by == "position":
+                reverse = False
+            entries.sort(key=lambda e, f=sort_by: (getattr(e, f) or "").lower(), reverse=reverse)
+        w = _to_model(d)
+        w.entries = entries
+        return w
+    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def find_symbol(query: str) -> list[dict]:
+    q = query.lower()
+    data = _load()
+    results = []
+    for d in data:
+        matches = [e for e in d.get("entries", []) if q in e["ticker"].lower() or q in e.get("name", "").lower()]
+        if matches:
+            results.append({"id": d["id"], "name": d["name"], "entries": [WatchlistEntry(**e) for e in matches]})
+    return results
+
+
+def search_watchlists(name: str = "", tag: str = "", favorite: bool | None = None) -> list[Watchlist]:
+    data = _load()
+    data = _ensure_default(data)
+    result = [_to_model(d) for d in data]
+    if name:
+        n = name.lower()
+        result = [w for w in result if n in w.name.lower()]
+    if tag:
+        t = tag.lower()
+        result = [w for w in result if any(t in tg.lower() for tg in w.tags)]
+    if favorite is not None:
+        result = [w for w in result if w.favorite == favorite]
+    return result
+
+
 def _load_stocks_index() -> dict[str, dict]:
     try:
         with open(_STOCKS_PATH) as f:

@@ -5,6 +5,7 @@ from app.services.watchlist import (
     add_symbol, remove_symbol, reorder,
     set_description, add_tag, remove_tag, set_notes, toggle_favorite,
     refresh_metadata, refresh_all,
+    query_entries, find_symbol, search_watchlists,
 )
 from app.models.watchlist import Watchlist
 
@@ -427,3 +428,122 @@ def test_sync_updates_valid_flag():
     add_symbol(w.id, "BBCA")
     w2 = refresh_metadata(w.id)
     assert w2.entries[0].valid is True
+
+
+def test_query_entries_search_ticker():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "BBRI")
+    r = query_entries(w.id, search="BBCA")
+    assert len(r.entries) == 1
+    assert r.entries[0].ticker == "BBCA"
+
+
+def test_query_entries_search_name():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    r = query_entries(w.id, search="bank")
+    assert len(r.entries) >= 1
+
+
+def test_query_entries_search_no_match():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    r = query_entries(w.id, search="ZZZZZZ")
+    assert len(r.entries) == 0
+
+
+def test_query_entries_filter_sector():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    r = query_entries(w.id, sector="Energy")
+    assert all("Energy" in e.sector for e in r.entries)
+    assert any(e.ticker == "ADRO" for e in r.entries)
+
+
+def test_query_entries_filter_valid():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ZZZZ")
+    r = query_entries(w.id, valid=True)
+    assert all(e.valid for e in r.entries)
+
+
+def test_query_entries_sort_ticker():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBRI")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    r = query_entries(w.id, sort_by="ticker")
+    tickers = [e.ticker for e in r.entries]
+    assert tickers == sorted(tickers)
+
+
+def test_query_entries_sort_name():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    r = query_entries(w.id, sort_by="name")
+    names = [e.name for e in r.entries]
+    assert names == sorted(names)
+
+
+def test_query_entries_combined():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "BBRI")
+    add_symbol(w.id, "ADRO")
+    r = query_entries(w.id, sector="Financials", sort_by="ticker")
+    assert all("Financials" in e.sector for e in r.entries)
+    tickers = [e.ticker for e in r.entries]
+    assert tickers == sorted(tickers)
+
+
+def test_find_symbol_found():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    results = find_symbol("BBCA")
+    assert len(results) >= 1
+    assert results[0]["name"] == "Test"
+
+
+def test_find_symbol_not_found():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    results = find_symbol("ZZZZZZ")
+    assert len(results) == 0
+
+
+def test_search_watchlists_by_name():
+    _clean()
+    w = create("Portofolio Saya")
+    results = search_watchlists(name="portofolio")
+    assert any(r.id == w.id for r in results)
+
+
+def test_search_watchlists_by_tag():
+    _clean()
+    w = create("Test")
+    add_tag(w.id, "blue-chip")
+    results = search_watchlists(tag="blue")
+    assert any(r.id == w.id for r in results)
+
+
+def test_search_watchlists_by_favorite():
+    _clean()
+    w = create("Test")
+    toggle_favorite(w.id)
+    results = search_watchlists(favorite=True)
+    assert any(r.id == w.id for r in results)
