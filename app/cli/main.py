@@ -23,6 +23,8 @@ from app.services.watchlist import (
     remove_tag as wl_tag_remove,
     set_notes as wl_notes,
     toggle_favorite as wl_fav,
+    refresh_metadata as wl_sync,
+    refresh_all as wl_sync_all,
 )
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
@@ -350,9 +352,11 @@ def show(wl_id: str) -> None:
     table.add_column("Ticker", style="cyan")
     table.add_column("Nama")
     table.add_column("Sektor")
+    table.add_column("Status")
     table.add_column("Ditambahkan")
     for e in w.entries:
-        table.add_row(str(e.position + 1), e.ticker, e.name or "", e.sector or "", e.added_at[:10])
+        status = "[green]Aktif[/green]" if e.valid else "[red]Tidak Aktif[/red]"
+        table.add_row(str(e.position + 1), e.ticker, e.name or "", e.sector or "", status, e.added_at[:10])
     console.print(table)
 
 
@@ -440,6 +444,21 @@ def favorite(wl_id: str) -> None:
         console.print(f"[red]✗[/red] {e}")
 
 
+@watchlist_cmd.command()
+def sync(wl_id: str = typer.Argument("", help="ID watchlist (kosongkan untuk semua)")) -> None:
+    """Sinkronkan metadata simbol dengan data terbaru."""
+    try:
+        if wl_id:
+            w = wl_sync(wl_id)
+            console.print(f"[green]✓[/green] [bold]'{w.name}'[/bold] disinkronkan ({len(w.entries)} simbol)")
+        else:
+            results = wl_sync_all()
+            total = sum(r["changed"] for r in results)
+            console.print(f"[green]✓[/green] {len(results)} watchlist disinkronkan ({total} perubahan)")
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
 @app.command()
 def info() -> None:
     console.print("[bold]Available commands:[/bold]")
@@ -469,6 +488,7 @@ def info() -> None:
     console.print("  watchlist untag      - Hapus tag")
     console.print("  watchlist notes      - Atur catatan watchlist")
     console.print("  watchlist favorite   - Tandai/hapus favorit")
+    console.print("  watchlist sync       - Sinkronkan metadata simbol")
     console.print("  info                 - Bantuan ini")
 
 

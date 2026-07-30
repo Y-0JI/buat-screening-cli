@@ -4,6 +4,7 @@ from app.services.watchlist import (
     _DATA_PATH, create, rename, delete, list_all, get_by_id,
     add_symbol, remove_symbol, reorder,
     set_description, add_tag, remove_tag, set_notes, toggle_favorite,
+    refresh_metadata, refresh_all,
 )
 from app.models.watchlist import Watchlist
 
@@ -373,3 +374,56 @@ def test_add_symbol_preserves_existing_entries():
     assert len(w2.entries) == 2
     assert w2.entries[0].ticker == "BBCA"
     assert w2.entries[1].ticker == "BBRI"
+
+
+def test_symbol_valid_flag_set():
+    _clean()
+    w = create("Test")
+    w2 = add_symbol(w.id, "BBCA")
+    assert w2.entries[0].valid is True
+
+
+def test_refresh_metadata():
+    _clean()
+    w = create("Test")
+    w2 = add_symbol(w.id, "BBCA")
+    assert w2.entries[0].name
+    w3 = refresh_metadata(w.id)
+    assert w3.entries[0].name
+    assert w3.entries[0].last_synced
+
+
+def test_refresh_metadata_invalid_id():
+    _clean()
+    try:
+        refresh_metadata("nonexistent")
+        assert False, "should raise"
+    except ValueError:
+        pass
+
+
+def test_refresh_all():
+    _clean()
+    w1 = create("A")
+    w2 = create("B")
+    add_symbol(w1.id, "BBCA")
+    add_symbol(w2.id, "BBRI")
+    results = refresh_all()
+    assert len(results) == 3  # default + A + B
+    for r in results:
+        assert "id" in r
+        assert "name" in r
+
+
+def test_refresh_all_empty_watchlist():
+    _clean()
+    results = refresh_all()
+    assert len(results) == 1  # default watchlist only, no entries
+
+
+def test_sync_updates_valid_flag():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBCA")
+    w2 = refresh_metadata(w.id)
+    assert w2.entries[0].valid is True

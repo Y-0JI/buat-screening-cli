@@ -11,6 +11,8 @@ class WatchlistEntry(BaseModel):
     exchange: str = ""
     industry: str = ""
     currency: str = ""
+    valid: bool = True
+    last_synced: str = ""
     added_at: str = ""
     position: int = 0
 

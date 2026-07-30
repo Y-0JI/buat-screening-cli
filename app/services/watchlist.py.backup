@@ -77,7 +77,7 @@ def rename(wl_id: str, new_name: str) -> Watchlist:
             d["updated_at"] = _now()
             _save(data)
             return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def delete(wl_id: str) -> None:
@@ -85,7 +85,61 @@ def delete(wl_id: str) -> None:
     before = len(data)
     data = [d for d in data if d["id"] != wl_id]
     if len(data) == before:
-        raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def refresh_metadata(wl_id: str) -> Watchlist:
+    data = _load()
+    for d in data:
+        if d["id"] != wl_id:
+            continue
+        now = _now()
+        changed = 0
+        for e in d["entries"]:
+            meta = _stock_metadata(e["ticker"])
+            if e["name"] != meta["name"]:
+                e["name"] = meta["name"]
+                changed += 1
+            if e["sector"] != meta["sector"]:
+                e["sector"] = meta["sector"]
+                changed += 1
+            if e.get("valid", True) != meta["valid"]:
+                e["valid"] = meta["valid"]
+                changed += 1
+            e["last_synced"] = now
+        if changed:
+            d["updated_at"] = now
+        _save(data)
+        return _to_model(d)
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+
+
+def refresh_all() -> list[dict]:
+    data = _load()
+    now = _now()
+    total_changed = 0
+    for d in data:
+        wl_changed = 0
+        for e in d["entries"]:
+            meta = _stock_metadata(e["ticker"])
+            if e["name"] != meta["name"]:
+                e["name"] = meta["name"]
+                wl_changed += 1
+            if e["sector"] != meta["sector"]:
+                e["sector"] = meta["sector"]
+                wl_changed += 1
+            if e.get("valid", True) != meta["valid"]:
+                e["valid"] = meta["valid"]
+                wl_changed += 1
+            e["last_synced"] = now
+        if wl_changed:
+            d["updated_at"] = now
+            total_changed += wl_changed
+    if total_changed:
+        _save(data)
+    return [{"id": d["id"], "name": d["name"], "changed": sum(
+        1 for e in d["entries"] if e["last_synced"] == now
+    )} for d in data]
     data = _ensure_default(data)
     _save(data)
 
@@ -101,7 +155,7 @@ def get_by_id(wl_id: str) -> Watchlist:
     for d in data:
         if d["id"] == wl_id:
             return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def add_symbol(wl_id: str, ticker: str) -> Watchlist:
@@ -115,12 +169,12 @@ def add_symbol(wl_id: str, ticker: str) -> Watchlist:
             raise ValueError(f"'{t}' sudah ada di watchlist")
         meta = _stock_metadata(t)
         pos = len(d["entries"])
-        entry = WatchlistEntry(ticker=t, name=meta["name"], sector=meta["sector"], added_at=_now(), position=pos)
+        entry = WatchlistEntry(ticker=t, name=meta["name"], sector=meta["sector"], valid=meta["valid"], added_at=_now(), position=pos)
         d["entries"].append(entry.model_dump())
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def remove_symbol(wl_id: str, ticker: str) -> Watchlist:
@@ -138,7 +192,7 @@ def remove_symbol(wl_id: str, ticker: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def set_description(wl_id: str, description: str) -> Watchlist:
@@ -150,7 +204,7 @@ def set_description(wl_id: str, description: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def add_tag(wl_id: str, tag: str) -> Watchlist:
@@ -166,7 +220,7 @@ def add_tag(wl_id: str, tag: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def remove_tag(wl_id: str, tag: str) -> Watchlist:
@@ -182,7 +236,7 @@ def remove_tag(wl_id: str, tag: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def set_notes(wl_id: str, notes: str) -> Watchlist:
@@ -194,7 +248,7 @@ def set_notes(wl_id: str, notes: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def toggle_favorite(wl_id: str) -> Watchlist:
@@ -206,7 +260,7 @@ def toggle_favorite(wl_id: str) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
 def reorder(wl_id: str, tickers: list[str]) -> Watchlist:
@@ -232,67 +286,4 @@ def reorder(wl_id: str, tickers: list[str]) -> Watchlist:
         d["updated_at"] = _now()
         _save(data)
         return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
-
-
-def _load_stocks_index() -> dict[str, dict]:
-    try:
-        with open(_STOCKS_PATH) as f:
-            stocks = json.load(f)
-        return {s["ticker"]: s for s in stocks}
-    except Exception:
-        return {}
-
-
-def _sync_entry(entry: dict, stock_index: dict[str, dict]) -> bool:
-    t = entry["ticker"]
-    meta = stock_index.get(t)
-    changed = False
-    if meta:
-        for field in ("name", "sector"):
-            new_val = meta.get(field, "")
-            if entry.get(field) != new_val:
-                entry[field] = new_val
-                changed = True
-        new_valid = meta.get("valid", True)
-        if entry.get("valid") != new_valid:
-            entry["valid"] = new_valid
-            changed = True
-    else:
-        if entry.get("valid") is not False:
-            entry["valid"] = False
-            changed = True
-    entry["last_synced"] = _now()
-    return changed
-
-
-def refresh_metadata(wl_id: str) -> Watchlist:
-    data = _load()
-    stock_index = _load_stocks_index()
-    for d in data:
-        if d["id"] != wl_id:
-            continue
-        changed = 0
-        for e in d["entries"]:
-            if _sync_entry(e, stock_index):
-                changed += 1
-        d["updated_at"] = _now()
-        _save(data)
-        return _to_model(d)
-    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
-
-
-def refresh_all() -> list[dict]:
-    data = _load()
-    data = _ensure_default(data)
-    stock_index = _load_stocks_index()
-    results = []
-    for d in data:
-        changed = 0
-        for e in d["entries"]:
-            if _sync_entry(e, stock_index):
-                changed += 1
-        d["updated_at"] = _now()
-        results.append({"id": d["id"], "name": d["name"], "changed": changed})
-    _save(data)
-    return results
+#    raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
