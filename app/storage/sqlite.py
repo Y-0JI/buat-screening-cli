@@ -1,7 +1,6 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
 
 from app.storage.base import StorageBackend
 
@@ -9,19 +8,19 @@ _DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "watchlists.db"
 
 
 class SqliteStorage(StorageBackend):
-    def __init__(self) -> None:
+    def __init__(self, path: str | None = None) -> None:
+        self._path = path or _DB_PATH
         self._conn: sqlite3.Connection | None = None
 
     def _get_conn(self) -> sqlite3.Connection:
         if self._conn is None:
-            self._conn = sqlite3.connect(_DB_PATH)
+            self._conn = sqlite3.connect(self._path)
             self._conn.row_factory = sqlite3.Row
             self._init_db()
         return self._conn
 
     def _init_db(self) -> None:
-        conn = self._conn
-        conn.executescript(
+        self._conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS watchlists (
                 id TEXT PRIMARY KEY,
@@ -50,7 +49,7 @@ class SqliteStorage(StorageBackend):
             );
             """
         )
-        conn.commit()
+        self._conn.commit()
 
     def load(self) -> list[dict]:
         conn = self._get_conn()
@@ -69,39 +68,61 @@ class SqliteStorage(StorageBackend):
                 entry["valid"] = bool(entry["valid"])
                 wl["entries"].append(entry)
             watchlists.append(wl)
-        if conn:
-            conn.rollback()
+        conn.rollback()
         return watchlists
 
-    def save(self, data: list[dict]) -> None:
+    def _save_watchlist(self, conn: sqlite3.Connection, wl: dict) -> None:
+        tags_json = json.dumps(wl.get("tags", []))
+        conn.execute(
+            """INSERT OR REPLACE INTO watchlists
+            (id, name, description, tags, notes, favorite, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                wl["id"], wl["name"], wl.get("description", ""),
+                tags_json, wl.get("notes", ""),
+                int(wl.get("favorite", False)),
+                wl.get("created_at", ""), wl.get("updated_at", ""),
+            ),
+        )
+
+    def _save_entry(self, conn: sqlite3.Connection, entry: dict, wl_id: str) -> None:
+        conn.execute(
+            """INSERT OR REPLACE INTO entries
+            (ticker, name, sector, exchange, industry, currency,
+             valid, last_synced, added_at, position, watchlist_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                entry["ticker"], entry.get("name", ""), entry.get("sector", ""),
+                entry.get("exchange", ""), entry.get("industry", ""),
+                entry.get("currency", ""), int(entry.get("valid", True)),
+                entry.get("last_synced", ""), entry.get("added_at", ""),
+                entry.get("position", 0), wl_id,
+            ),
+        )
+
+    def save_full(self, data: list[dict]) -> None:
         conn = self._get_conn()
         conn.execute("DELETE FROM entries")
         conn.execute("DELETE FROM watchlists")
         for wl in data:
-            tags_json = json.dumps(wl.get("tags", []))
-            conn.execute(
-                """INSERT INTO watchlists
-                (id, name, description, tags, notes, favorite, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    wl["id"], wl["name"], wl.get("description", ""),
-                    tags_json, wl.get("notes", ""),
-                    int(wl.get("favorite", False)),
-                    wl.get("created_at", ""), wl.get("updated_at", ""),
-                ),
-            )
+            self._save_watchlist(conn, wl)
             for e in wl.get("entries", []):
-                conn.execute(
-                    """INSERT INTO entries
-                    (ticker, name, sector, exchange, industry, currency,
-                     valid, last_synced, added_at, position, watchlist_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        e["ticker"], e.get("name", ""), e.get("sector", ""),
-                        e.get("exchange", ""), e.get("industry", ""),
-                        e.get("currency", ""), int(e.get("valid", True)),
-                        e.get("last_synced", ""), e.get("added_at", ""),
-                        e.get("position", 0), wl["id"],
-                    ),
-                )
+                self._save_entry(conn, e, wl["id"])
+        conn.commit()
+
+    def save(self, data: list[dict]) -> None:
+        """Incremental: hanya update/insert, tidak hapus data di luar data yang diberikan."""
+        conn = self._get_conn()
+        existing_ids = {row[0] for row in conn.execute("SELECT id FROM watchlists").fetchall()}
+        new_ids = {wl["id"] for wl in data}
+        for wl in data:
+            self._save_watchlist(conn, wl)
+            if wl["id"] in existing_ids:
+                conn.execute("DELETE FROM entries WHERE watchlist_id = ?", (wl["id"],))
+            for e in wl.get("entries", []):
+                self._save_entry(conn, e, wl["id"])
+        unused_ids = existing_ids - new_ids
+        for uid in unused_ids:
+            conn.execute("DELETE FROM entries WHERE watchlist_id = ?", (uid,))
+            conn.execute("DELETE FROM watchlists WHERE id = ?", (uid,))
         conn.commit()

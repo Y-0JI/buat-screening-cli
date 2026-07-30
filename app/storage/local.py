@@ -7,12 +7,15 @@ _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "watchlists.j
 
 
 class LocalJsonStorage(StorageBackend):
+    def __init__(self, path: str | None = None) -> None:
+        self._path = path or _DATA_PATH
+
     def load(self) -> list[dict]:
-        if not os.path.exists(_DATA_PATH):
+        if not os.path.exists(self._path):
             return []
-        with open(_DATA_PATH) as f:
+        with open(self._path) as f:
             return json.load(f)
 
     def save(self, data: list[dict]) -> None:
-        with open(_DATA_PATH, "w") as f:
+        with open(self._path, "w") as f:
             json.dump(data, f, indent=2)

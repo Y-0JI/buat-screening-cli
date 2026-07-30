@@ -32,6 +32,8 @@ class YahooFinanceProvider(Provider):
                         ticker=ticker.upper(),
                         name=info.get("longName", ticker.upper()),
                         sector=info.get("sector"),
+                        industry=info.get("industry"),
+                        exchange=info.get("exchange"),
                         market_cap=info.get("marketCap"),
                         currency=info.get("currency", "IDR"),
                     )

@@ -1,13 +1,21 @@
 from app.config.settings import settings
 
 _BACKENDS: dict[str, type] = {}
+_test_backend: "StorageBackend | None" = None
 
 
 def register(name: str, cls: type) -> None:
     _BACKENDS[name] = cls
 
 
+def set_test_backend(backend: "StorageBackend | None") -> None:
+    global _test_backend
+    _test_backend = backend
+
+
 def get_backend() -> "StorageBackend":
+    if _test_backend is not None:
+        return _test_backend
     name = settings.watchlist_storage
     cls = _BACKENDS.get(name)
     if not cls:

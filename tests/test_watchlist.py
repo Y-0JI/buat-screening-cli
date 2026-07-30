@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 from app.services.watchlist import (
     create, rename, delete, list_all, get_by_id,
     add_symbol, remove_symbol, reorder,
@@ -7,10 +10,28 @@ from app.services.watchlist import (
     reset_data,
 )
 from app.models.watchlist import Watchlist
+from app.storage import set_test_backend
+from app.storage.local import LocalJsonStorage
+from app.storage.sqlite import SqliteStorage
+
+_JSON_DATA_PATH: str | None = None
 
 
 def _clean():
+    global _JSON_DATA_PATH
+    fd, _JSON_DATA_PATH = tempfile.mkstemp(suffix=".json", prefix="watchlist_test_")
+    os.close(fd)
+    backend = LocalJsonStorage(path=_JSON_DATA_PATH)
+    set_test_backend(backend)
     reset_data()
+
+
+def _cleanup():
+    global _JSON_DATA_PATH
+    set_test_backend(None)
+    if _JSON_DATA_PATH and os.path.exists(_JSON_DATA_PATH):
+        os.unlink(_JSON_DATA_PATH)
+    _JSON_DATA_PATH = None
 
 
 def test_create():
@@ -18,6 +39,7 @@ def test_create():
     w = create("Test")
     assert w.name == "Test"
     assert w.id
+    _cleanup()
 
 
 def test_create_duplicate_name():
@@ -28,6 +50,7 @@ def test_create_duplicate_name():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_rename():
@@ -35,6 +58,7 @@ def test_rename():
     w = create("A")
     renamed = rename(w.id, "B")
     assert renamed.name == "B"
+    _cleanup()
 
 
 def test_rename_to_existing():
@@ -46,14 +70,16 @@ def test_rename_to_existing():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_delete():
     _clean()
     w = create("X")
     delete(w.id)
-    assert len(list_all()) == 1  # default watchlist remains
+    assert len(list_all()) == 1
     assert list_all()[0].name == "Watchlist Saya"
+    _cleanup()
 
 
 def test_delete_not_found():
@@ -63,14 +89,16 @@ def test_delete_not_found():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_list_all():
     _clean()
-    assert len(list_all()) == 1  # default
+    assert len(list_all()) == 1
     create("A")
     create("B")
     assert len(list_all()) == 3
+    _cleanup()
 
 
 def test_get_by_id():
@@ -79,6 +107,7 @@ def test_get_by_id():
     same = get_by_id(w.id)
     assert same.id == w.id
     assert same.name == w.name
+    _cleanup()
 
 
 def test_get_by_id_not_found():
@@ -88,6 +117,7 @@ def test_get_by_id_not_found():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_add_symbol():
@@ -96,6 +126,7 @@ def test_add_symbol():
     w2 = add_symbol(w.id, "bbca")
     assert len(w2.entries) == 1
     assert w2.entries[0].ticker == "BBCA"
+    _cleanup()
 
 
 def test_add_duplicate_symbol():
@@ -107,6 +138,7 @@ def test_add_duplicate_symbol():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_add_symbol_different_watchlist():
@@ -117,6 +149,7 @@ def test_add_symbol_different_watchlist():
     add_symbol(w2.id, "BBCA")
     assert len(get_by_id(w1.id).entries) == 1
     assert len(get_by_id(w2.id).entries) == 1
+    _cleanup()
 
 
 def test_remove_symbol():
@@ -127,6 +160,7 @@ def test_remove_symbol():
     w2 = remove_symbol(w.id, "BBCA")
     assert len(w2.entries) == 1
     assert w2.entries[0].ticker == "BBRI"
+    _cleanup()
 
 
 def test_remove_not_found():
@@ -137,6 +171,7 @@ def test_remove_not_found():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_reorder():
@@ -147,6 +182,7 @@ def test_reorder():
     add_symbol(w.id, "BMRI")
     w2 = reorder(w.id, ["BMRI", "BBCA", "BBRI"])
     assert [e.ticker for e in w2.entries] == ["BMRI", "BBCA", "BBRI"]
+    _cleanup()
 
 
 def test_reorder_mismatch():
@@ -159,6 +195,7 @@ def test_reorder_mismatch():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_persistence():
@@ -166,10 +203,10 @@ def test_persistence():
     create("A")
     w = list_all()[0]
     assert w.name == "Watchlist Saya"
-    # reload from file
     list_all()
     list_all()
     assert len(list_all()) == 2
+    _cleanup()
 
 
 def test_default_watchlist_created():
@@ -177,6 +214,7 @@ def test_default_watchlist_created():
     watchlists = list_all()
     assert len(watchlists) >= 1
     assert watchlists[0].name == "Watchlist Saya"
+    _cleanup()
 
 
 def test_set_description():
@@ -184,6 +222,7 @@ def test_set_description():
     w = create("Test")
     w2 = set_description(w.id, "Saham pilihan saya")
     assert w2.description == "Saham pilihan saya"
+    _cleanup()
 
 
 def test_set_description_empty():
@@ -191,6 +230,7 @@ def test_set_description_empty():
     w = create("Test")
     w2 = set_description(w.id, "")
     assert w2.description == ""
+    _cleanup()
 
 
 def test_add_tag():
@@ -198,6 +238,7 @@ def test_add_tag():
     w = create("Test")
     w2 = add_tag(w.id, "blue-chip")
     assert "blue-chip" in w2.tags
+    _cleanup()
 
 
 def test_add_tag_duplicate():
@@ -209,6 +250,7 @@ def test_add_tag_duplicate():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_remove_tag():
@@ -219,6 +261,7 @@ def test_remove_tag():
     w2 = remove_tag(w.id, "blue-chip")
     assert "blue-chip" not in w2.tags
     assert "dividen" in w2.tags
+    _cleanup()
 
 
 def test_remove_tag_not_found():
@@ -229,6 +272,7 @@ def test_remove_tag_not_found():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_multiple_tags():
@@ -239,6 +283,7 @@ def test_multiple_tags():
     add_tag(w.id, "c")
     w2 = get_by_id(w.id)
     assert sorted(w2.tags) == ["a", "b", "c"]
+    _cleanup()
 
 
 def test_set_notes():
@@ -246,6 +291,7 @@ def test_set_notes():
     w = create("Test")
     w2 = set_notes(w.id, "Pantau terus")
     assert w2.notes == "Pantau terus"
+    _cleanup()
 
 
 def test_set_notes_empty():
@@ -254,6 +300,7 @@ def test_set_notes_empty():
     set_notes(w.id, "Catatan")
     w2 = set_notes(w.id, "")
     assert w2.notes == ""
+    _cleanup()
 
 
 def test_toggle_favorite():
@@ -264,6 +311,7 @@ def test_toggle_favorite():
     assert w2.favorite
     w3 = toggle_favorite(w.id)
     assert not w3.favorite
+    _cleanup()
 
 
 def test_metadata_independent_from_entries():
@@ -280,6 +328,7 @@ def test_metadata_independent_from_entries():
     assert w2.notes == "Catatan"
     assert w2.favorite
     assert len(w2.entries) == 1
+    _cleanup()
 
 
 def test_metadata_persistence():
@@ -294,6 +343,7 @@ def test_metadata_persistence():
     assert "tag-a" in w2.tags
     assert w2.notes == "Aman"
     assert w2.favorite
+    _cleanup()
 
 
 def test_new_watchlist_has_default_metadata():
@@ -303,6 +353,7 @@ def test_new_watchlist_has_default_metadata():
     assert w.tags == []
     assert w.notes == ""
     assert not w.favorite
+    _cleanup()
 
 
 def test_tag_case_sensitive():
@@ -311,6 +362,7 @@ def test_tag_case_sensitive():
     add_tag(w.id, "Blue-Chip")
     w2 = add_tag(w.id, "blue-chip")
     assert len(w2.tags) == 2
+    _cleanup()
 
 
 def test_symbol_metadata_populated():
@@ -321,6 +373,7 @@ def test_symbol_metadata_populated():
     assert e.ticker == "BBCA"
     assert e.name
     assert "Financial" in e.sector
+    _cleanup()
 
 
 def test_symbol_metadata_unknown_ticker():
@@ -331,6 +384,7 @@ def test_symbol_metadata_unknown_ticker():
     assert e.ticker == "ZZZZ"
     assert e.name == ""
     assert e.sector == ""
+    _cleanup()
 
 
 def test_symbol_metadata_persisted():
@@ -341,6 +395,7 @@ def test_symbol_metadata_persisted():
     e = w2.entries[0]
     assert e.name
     assert "Financial" in e.sector
+    _cleanup()
 
 
 def test_symbol_metadata_multiple_symbols():
@@ -354,6 +409,7 @@ def test_symbol_metadata_multiple_symbols():
     assert names["BBCA"]
     assert names["ADRO"]
     assert names["TLKM"]
+    _cleanup()
 
 
 def test_symbol_metadata_updated_at_add():
@@ -363,6 +419,7 @@ def test_symbol_metadata_updated_at_add():
     e = w2.entries[0]
     assert e.added_at
     assert e.position == 0
+    _cleanup()
 
 
 def test_add_symbol_preserves_existing_entries():
@@ -373,6 +430,7 @@ def test_add_symbol_preserves_existing_entries():
     assert len(w2.entries) == 2
     assert w2.entries[0].ticker == "BBCA"
     assert w2.entries[1].ticker == "BBRI"
+    _cleanup()
 
 
 def test_symbol_valid_flag_set():
@@ -380,6 +438,7 @@ def test_symbol_valid_flag_set():
     w = create("Test")
     w2 = add_symbol(w.id, "BBCA")
     assert w2.entries[0].valid is True
+    _cleanup()
 
 
 def test_refresh_metadata():
@@ -390,6 +449,7 @@ def test_refresh_metadata():
     w3 = refresh_metadata(w.id)
     assert w3.entries[0].name
     assert w3.entries[0].last_synced
+    _cleanup()
 
 
 def test_refresh_metadata_invalid_id():
@@ -399,6 +459,7 @@ def test_refresh_metadata_invalid_id():
         assert False, "should raise"
     except ValueError:
         pass
+    _cleanup()
 
 
 def test_refresh_all():
@@ -408,16 +469,18 @@ def test_refresh_all():
     add_symbol(w1.id, "BBCA")
     add_symbol(w2.id, "BBRI")
     results = refresh_all()
-    assert len(results) == 3  # default + A + B
+    assert len(results) == 3
     for r in results:
         assert "id" in r
         assert "name" in r
+    _cleanup()
 
 
 def test_refresh_all_empty_watchlist():
     _clean()
     results = refresh_all()
-    assert len(results) == 1  # default watchlist only, no entries
+    assert len(results) == 1
+    _cleanup()
 
 
 def test_sync_updates_valid_flag():
@@ -426,6 +489,7 @@ def test_sync_updates_valid_flag():
     add_symbol(w.id, "BBCA")
     w2 = refresh_metadata(w.id)
     assert w2.entries[0].valid is True
+    _cleanup()
 
 
 def test_query_entries_search_ticker():
@@ -436,6 +500,7 @@ def test_query_entries_search_ticker():
     r = query_entries(w.id, search="BBCA")
     assert len(r.entries) == 1
     assert r.entries[0].ticker == "BBCA"
+    _cleanup()
 
 
 def test_query_entries_search_name():
@@ -444,6 +509,7 @@ def test_query_entries_search_name():
     add_symbol(w.id, "BBCA")
     r = query_entries(w.id, search="bank")
     assert len(r.entries) >= 1
+    _cleanup()
 
 
 def test_query_entries_search_no_match():
@@ -452,6 +518,7 @@ def test_query_entries_search_no_match():
     add_symbol(w.id, "BBCA")
     r = query_entries(w.id, search="ZZZZZZ")
     assert len(r.entries) == 0
+    _cleanup()
 
 
 def test_query_entries_filter_sector():
@@ -462,6 +529,7 @@ def test_query_entries_filter_sector():
     r = query_entries(w.id, sector="Energy")
     assert all("Energy" in e.sector for e in r.entries)
     assert any(e.ticker == "ADRO" for e in r.entries)
+    _cleanup()
 
 
 def test_query_entries_filter_valid():
@@ -471,6 +539,7 @@ def test_query_entries_filter_valid():
     add_symbol(w.id, "ZZZZ")
     r = query_entries(w.id, valid=True)
     assert all(e.valid for e in r.entries)
+    _cleanup()
 
 
 def test_query_entries_sort_ticker():
@@ -482,6 +551,7 @@ def test_query_entries_sort_ticker():
     r = query_entries(w.id, sort_by="ticker")
     tickers = [e.ticker for e in r.entries]
     assert tickers == sorted(tickers)
+    _cleanup()
 
 
 def test_query_entries_sort_name():
@@ -492,6 +562,20 @@ def test_query_entries_sort_name():
     r = query_entries(w.id, sort_by="name")
     names = [e.name for e in r.entries]
     assert names == sorted(names)
+    _cleanup()
+
+
+def test_query_entries_sort_position():
+    _clean()
+    w = create("Test")
+    add_symbol(w.id, "BBRI")
+    add_symbol(w.id, "BBCA")
+    add_symbol(w.id, "ADRO")
+    w2 = reorder(w.id, ["ADRO", "BBCA", "BBRI"])
+    r = query_entries(w2.id, sort_by="position")
+    positions = [e.position for e in r.entries]
+    assert positions == sorted(positions)
+    _cleanup()
 
 
 def test_query_entries_combined():
@@ -504,6 +588,7 @@ def test_query_entries_combined():
     assert all("Financials" in e.sector for e in r.entries)
     tickers = [e.ticker for e in r.entries]
     assert tickers == sorted(tickers)
+    _cleanup()
 
 
 def test_find_symbol_found():
@@ -514,6 +599,7 @@ def test_find_symbol_found():
     results = find_symbol("BBCA")
     assert len(results) >= 1
     assert results[0]["name"] == "Test"
+    _cleanup()
 
 
 def test_find_symbol_not_found():
@@ -522,6 +608,7 @@ def test_find_symbol_not_found():
     add_symbol(w.id, "BBCA")
     results = find_symbol("ZZZZZZ")
     assert len(results) == 0
+    _cleanup()
 
 
 def test_search_watchlists_by_name():
@@ -529,6 +616,7 @@ def test_search_watchlists_by_name():
     w = create("Portofolio Saya")
     results = search_watchlists(name="portofolio")
     assert any(r.id == w.id for r in results)
+    _cleanup()
 
 
 def test_search_watchlists_by_tag():
@@ -537,6 +625,7 @@ def test_search_watchlists_by_tag():
     add_tag(w.id, "blue-chip")
     results = search_watchlists(tag="blue")
     assert any(r.id == w.id for r in results)
+    _cleanup()
 
 
 def test_search_watchlists_by_favorite():
@@ -545,3 +634,24 @@ def test_search_watchlists_by_favorite():
     toggle_favorite(w.id)
     results = search_watchlists(favorite=True)
     assert any(r.id == w.id for r in results)
+    _cleanup()
+
+
+def test_rename_ke_nama_sendiri():
+    _clean()
+    w = create("Test Watchlist")
+    w2 = rename(w.id, "Test Watchlist")
+    assert w2.name == "Test Watchlist"
+    _cleanup()
+
+
+def test_rename_ke_nama_orang_lain_tetap_ditolak():
+    _clean()
+    create("A")
+    w2 = create("B")
+    try:
+        rename(w2.id, "A")
+        assert False, "should raise"
+    except ValueError:
+        pass
+    _cleanup()

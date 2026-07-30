@@ -68,8 +68,9 @@ def create(name: str) -> Watchlist:
 
 def rename(wl_id: str, new_name: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
-        if d["name"] == new_name:
+        if d["id"] != wl_id and d["name"] == new_name:
             raise ValueError(f"Watchlist '{new_name}' sudah ada")
     for d in data:
         if d["id"] == wl_id:
@@ -98,6 +99,7 @@ def list_all() -> list[Watchlist]:
 
 def get_by_id(wl_id: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] == wl_id:
             return _to_model(d)
@@ -107,6 +109,7 @@ def get_by_id(wl_id: str) -> Watchlist:
 def add_symbol(wl_id: str, ticker: str) -> Watchlist:
     t = normalize(ticker)
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -126,6 +129,7 @@ def add_symbol(wl_id: str, ticker: str) -> Watchlist:
 def remove_symbol(wl_id: str, ticker: str) -> Watchlist:
     t = normalize(ticker)
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -143,6 +147,7 @@ def remove_symbol(wl_id: str, ticker: str) -> Watchlist:
 
 def set_description(wl_id: str, description: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -155,6 +160,7 @@ def set_description(wl_id: str, description: str) -> Watchlist:
 
 def add_tag(wl_id: str, tag: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -171,6 +177,7 @@ def add_tag(wl_id: str, tag: str) -> Watchlist:
 
 def remove_tag(wl_id: str, tag: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -187,6 +194,7 @@ def remove_tag(wl_id: str, tag: str) -> Watchlist:
 
 def set_notes(wl_id: str, notes: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -199,6 +207,7 @@ def set_notes(wl_id: str, notes: str) -> Watchlist:
 
 def toggle_favorite(wl_id: str) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -211,6 +220,7 @@ def toggle_favorite(wl_id: str) -> Watchlist:
 
 def reorder(wl_id: str, tickers: list[str]) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -247,6 +257,7 @@ def query_entries(
     sort_reverse: bool = False,
 ) -> Watchlist:
     data = _load()
+    data = _ensure_default(data)
     for d in data:
         if d["id"] != wl_id:
             continue
@@ -263,7 +274,9 @@ def query_entries(
             reverse = sort_reverse
             if sort_by == "position":
                 reverse = False
-            entries.sort(key=lambda e, f=sort_by: (getattr(e, f) or "").lower(), reverse=reverse)
+                entries.sort(key=lambda e: e.position or 0, reverse=reverse)
+            else:
+                entries.sort(key=lambda e, f=sort_by: (getattr(e, f) or "").lower(), reverse=reverse)
         w = _to_model(d)
         w.entries = entries
         return w
@@ -273,6 +286,7 @@ def query_entries(
 def find_symbol(query: str) -> list[dict]:
     q = query.lower()
     data = _load()
+    data = _ensure_default(data)
     results = []
     for d in data:
         matches = [e for e in d.get("entries", []) if q in e["ticker"].lower() or q in e.get("name", "").lower()]
@@ -305,10 +319,49 @@ def _load_stocks_index() -> dict[str, dict]:
         return {}
 
 
-def _sync_entry(entry: dict, stock_index: dict[str, dict]) -> bool:
+def _fetch_live_metadata(ticker: str) -> dict | None:
+    try:
+        from app.tools import get_provider
+        provider = get_provider()
+        data = provider.fetch(ticker, period="1mo")
+        if data and data.info:
+            info = data.info
+            return {
+                "name": info.name or "",
+                "sector": info.sector or "",
+                "industry": info.industry or "",
+                "exchange": info.exchange or "",
+                "currency": info.currency or "",
+                "valid": True,
+            }
+    except Exception:
+        pass
+    return None
+
+
+def _sync_entry(entry: dict, stock_index: dict[str, dict], live: bool = False) -> bool:
     t = entry["ticker"]
-    meta = stock_index.get(t)
     changed = False
+    if live:
+        live_meta = _fetch_live_metadata(t)
+        if live_meta is not None:
+            for field in ("name", "sector", "industry", "exchange", "currency"):
+                new_val = live_meta.get(field, "")
+                if entry.get(field) != new_val:
+                    entry[field] = new_val
+                    changed = True
+            if entry.get("valid") is not True:
+                entry["valid"] = True
+                changed = True
+            entry["last_synced"] = _now()
+            return changed
+        else:
+            if entry.get("valid") is not False:
+                entry["valid"] = False
+                changed = True
+            entry["last_synced"] = _now()
+            return changed
+    meta = stock_index.get(t)
     if meta:
         for field in ("name", "sector"):
             new_val = meta.get(field, "")
@@ -327,7 +380,7 @@ def _sync_entry(entry: dict, stock_index: dict[str, dict]) -> bool:
     return changed
 
 
-def refresh_metadata(wl_id: str) -> Watchlist:
+def refresh_metadata(wl_id: str, live: bool = False) -> Watchlist:
     data = _load()
     stock_index = _load_stocks_index()
     for d in data:
@@ -335,7 +388,7 @@ def refresh_metadata(wl_id: str) -> Watchlist:
             continue
         changed = 0
         for e in d["entries"]:
-            if _sync_entry(e, stock_index):
+            if _sync_entry(e, stock_index, live=live):
                 changed += 1
         d["updated_at"] = _now()
         _save(data)
@@ -343,7 +396,7 @@ def refresh_metadata(wl_id: str) -> Watchlist:
     raise ValueError(f"Watchlist id '{wl_id}' tidak ditemukan")
 
 
-def refresh_all() -> list[dict]:
+def refresh_all(live: bool = False) -> list[dict]:
     data = _load()
     data = _ensure_default(data)
     stock_index = _load_stocks_index()
@@ -351,7 +404,7 @@ def refresh_all() -> list[dict]:
     for d in data:
         changed = 0
         for e in d["entries"]:
-            if _sync_entry(e, stock_index):
+            if _sync_entry(e, stock_index, live=live):
                 changed += 1
         d["updated_at"] = _now()
         results.append({"id": d["id"], "name": d["name"], "changed": changed})
