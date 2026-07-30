@@ -39,7 +39,7 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
 
     system_prompt = _load_prompt("system.md")
     store = get_store()
-    memory_block = store.serialize_for_prompt()
+    memory_block = store.serialize_for_prompt(ticker=t)
     if memory_block:
         system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
     else:
@@ -50,7 +50,7 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     ], temperature=0)
 
     if llm_result:
-        store.add(MemoryType.RESEARCH_FINDING, f"{t}: {llm_result.split(chr(10))[0][:120]}", source=t)
+        store.add_or_update(MemoryType.RESEARCH_FINDING, f"{t}: {llm_result.split(chr(10))[0][:120]}", source=t)
         return AIAnalysis(
             ticker=t,
             summary=llm_result,
@@ -92,7 +92,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     system_prompt = _load_prompt("system.md")
     store = get_store()
-    memory_block = store.serialize_for_prompt()
+    memory_block = store.serialize_for_prompt(ticker=",".join(tickers))
     if memory_block:
         system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
     else:
@@ -104,7 +104,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
     if llm_result:
-        store.add(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
+        store.add_or_update(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
     if failed:
         analysis += f"\n\n⚠ Tidak dapat memuat data: {', '.join(failed)}"
 

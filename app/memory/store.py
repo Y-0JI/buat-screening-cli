@@ -92,13 +92,54 @@ class MemoryStore:
             json.dump(data, f, indent=2)
         os.replace(tmp, self._path)
 
-    def serialize_for_prompt(self, limit: int = 10) -> str:
-        entries = self.get_recent(limit)
-        if not entries:
-            return ""
-        lines = ["[MEMORI DARI SESI SEBELUMNYA]"]
+    def get_relevant(self, query: str, limit: int = 5) -> list[MemoryEntry]:
+        if not query:
+            return []
+        words = [w.lower() for w in query.split()]
+        entries = self.get_all()
+        matched = [e for e in entries if any(w in e.content.lower() or (e.source and w in e.source.lower()) for w in words)]
+        matched.sort(key=lambda e: e.created_at, reverse=True)
+        return matched[:limit]
+
+    def add_or_update(self, type: MemoryType, content: str, source: str | None = None) -> MemoryEntry:
+        entries = self.get_all()
         for e in entries:
-            source = f" ({e.source})" if e.source else ""
-            lines.append(f"- {e.content}{source}")
-        lines.append("[/MEMORI]")
-        return "\n".join(lines)
+            if e.type == type and e.source == source:
+                e.content = content
+                e.updated_at = datetime.now(timezone.utc)
+                self._save(entries)
+                return e
+        return self.add(type, content, source)
+
+    def serialize_for_prompt(self, ticker: str = "", limit: int = 10) -> str:
+        blocks = []
+
+        prefs = self.get_by_type(MemoryType.USER_PREFERENCE)
+        if prefs:
+            lines = ["[PREFERENSI USER]"]
+            for e in prefs:
+                lines.append(f"- {e.content}")
+            lines.append("[/PREFERENSI USER]")
+            blocks.append("\n".join(lines))
+
+        prior = self.get_relevant(ticker, limit=3) if ticker else []
+        if prior:
+            lines = ["[RISET SEBELUMNYA]"]
+            for e in prior:
+                lines.append(f"- {e.content}")
+            lines.append("[/RISET SEBELUMNYA]")
+            blocks.append("\n".join(lines))
+
+        shown_ids = {e.id for e in prefs} | {e.id for e in prior}
+        recent = [e for e in self.get_all() if e.id not in shown_ids]
+        recent.sort(key=lambda e: e.created_at, reverse=True)
+        recent = recent[:limit]
+        if recent:
+            lines = ["[KONTEKS TERBARU]"]
+            for e in recent:
+                source = f" ({e.source})" if e.source else ""
+                lines.append(f"- {e.content}{source}")
+            lines.append("[/KONTEKS TERBARU]")
+            blocks.append("\n".join(lines))
+
+        return "\n\n".join(blocks)
