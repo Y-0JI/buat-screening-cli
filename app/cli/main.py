@@ -28,6 +28,7 @@ from app.services.watchlist import (
     query_entries as wl_query,
     find_symbol as wl_find,
     search_watchlists as wl_search,
+    resolve_id as wl_resolve,
 )
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
@@ -291,6 +292,7 @@ def create(name: str) -> None:
 def rename(wl_id: str, new_name: str) -> None:
     """Ganti nama watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_rename(wl_id, new_name)
         console.print(f"[green]✓[/green] Watchlist diganti jadi [bold]'{w.name}'[/bold]")
     except ValueError as e:
@@ -301,6 +303,7 @@ def rename(wl_id: str, new_name: str) -> None:
 def delete(wl_id: str) -> None:
     """Hapus watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         wl_delete(wl_id)
         console.print(f"[green]✓[/green] Watchlist dihapus")
     except ValueError as e:
@@ -365,6 +368,7 @@ def show(
 ) -> None:
     """Tampilkan isi watchlist dengan opsi cari, filter, urut."""
     try:
+        wl_id = wl_resolve(wl_id)
         if search or sector or valid is not None or sort:
             w = wl_query(wl_id, search=search, sector=sector, valid=valid, sort_by=sort, sort_reverse=reverse)
         else:
@@ -403,6 +407,7 @@ def find(
 def add(wl_id: str, ticker: str) -> None:
     """Tambah simbol ke watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_add(wl_id, ticker)
         t = normalize(ticker)
         console.print(f"[green]✓[/green] [cyan]{t}[/cyan] ditambahkan ke [bold]'{w.name}'[/bold]")
@@ -414,6 +419,7 @@ def add(wl_id: str, ticker: str) -> None:
 def remove(wl_id: str, ticker: str) -> None:
     """Hapus simbol dari watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_remove(wl_id, ticker)
         t = normalize(ticker)
         console.print(f"[green]✓[/green] [cyan]{t}[/cyan] dihapus dari [bold]'{w.name}'[/bold]")
@@ -425,6 +431,7 @@ def remove(wl_id: str, ticker: str) -> None:
 def reorder(wl_id: str, tickers: str) -> None:
     """Ubah urutan simbol (pisah koma)."""
     try:
+        wl_id = wl_resolve(wl_id)
         ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
         w = wl_reorder(wl_id, ticker_list)
         console.print(f"[green]✓[/green] Urutan [bold]'{w.name}'[/bold] diperbarui")
@@ -436,6 +443,7 @@ def reorder(wl_id: str, tickers: str) -> None:
 def describe(wl_id: str, description: str) -> None:
     """Atur deskripsi watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_desc(wl_id, description)
         console.print(f"[green]✓[/green] Deskripsi [bold]'{w.name}'[/bold] diperbarui")
     except ValueError as e:
@@ -446,6 +454,7 @@ def describe(wl_id: str, description: str) -> None:
 def tag(wl_id: str, tag: str) -> None:
     """Tambah tag ke watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_tag_add(wl_id, tag)
         console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] ditambahkan ke [bold]'{w.name}'[/bold]")
     except ValueError as e:
@@ -456,6 +465,7 @@ def tag(wl_id: str, tag: str) -> None:
 def untag(wl_id: str, tag: str) -> None:
     """Hapus tag dari watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_tag_remove(wl_id, tag)
         console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] dihapus dari [bold]'{w.name}'[/bold]")
     except ValueError as e:
@@ -466,6 +476,7 @@ def untag(wl_id: str, tag: str) -> None:
 def notes(wl_id: str, notes: str) -> None:
     """Atur catatan watchlist."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_notes(wl_id, notes)
         console.print(f"[green]✓[/green] Catatan [bold]'{w.name}'[/bold] diperbarui")
     except ValueError as e:
@@ -476,6 +487,7 @@ def notes(wl_id: str, notes: str) -> None:
 def favorite(wl_id: str) -> None:
     """Tandai/hapus status favorit."""
     try:
+        wl_id = wl_resolve(wl_id)
         w = wl_fav(wl_id)
         status = "[yellow]★[/yellow] favorit" if w.favorite else "bukan favorit"
         console.print(f"[green]✓[/green] [bold]'{w.name}'[/bold] sekarang {status}")
@@ -490,6 +502,7 @@ def sync(
     """Sinkronkan metadata simbol dengan data terbaru."""
     try:
         if wl_id:
+            wl_id = wl_resolve(wl_id)
             w = wl_sync(wl_id)
             console.print(f"[green]✓[/green] [bold]'{w.name}'[/bold] disinkronkan ({len(w.entries)} simbol)")
         else:

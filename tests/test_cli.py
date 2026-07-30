@@ -1,3 +1,5 @@
+import os
+import tempfile
 from datetime import date, timedelta
 from unittest.mock import patch
 
@@ -6,6 +8,9 @@ from app.cli.main import app
 from app.models.stock import HistoricalPrice, StockInfo, StockData
 from app.router import engine
 from app.models.symbol import SymbolInfo
+from app.services.watchlist import create as wl_create, add_symbol as wl_add, reset_data
+from app.storage import set_test_backend
+from app.storage.local import LocalJsonStorage
 
 runner = CliRunner()
 
@@ -159,3 +164,34 @@ def test_score_invalid_ticker():
 def test_compare_invalid_ticker():
     result = runner.invoke(app, ["compare", "BBCA", "ABCDEFGHIJK"])
     assert result.exit_code != 0
+
+
+def _setup_wl_backend():
+    fd, path = tempfile.mkstemp(suffix=".json", prefix="watchlist_cli_test_")
+    os.close(fd)
+    set_test_backend(LocalJsonStorage(path=path))
+    reset_data()
+
+
+def _teardown_wl_backend():
+    set_test_backend(None)
+
+
+def test_watchlist_show_by_name():
+    _setup_wl_backend()
+    w = wl_create("Saham Saya")
+    wl_add(w.id, "BBCA")
+    result = runner.invoke(app, ["watchlist", "show", "Saham Saya"])
+    assert result.exit_code == 0
+    assert "Saham Saya" in result.stdout
+    assert "BBCA" in result.stdout
+    _teardown_wl_backend()
+
+
+def test_watchlist_show_nonexistent_name():
+    _setup_wl_backend()
+    wl_create("Saham Saya")
+    result = runner.invoke(app, ["watchlist", "show", "TidakAda"])
+    assert result.exit_code == 0
+    assert "tidak ditemukan" in result.stdout.lower()
+    _teardown_wl_backend()
