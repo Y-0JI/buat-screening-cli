@@ -446,7 +446,7 @@ def test_refresh_metadata():
     w = create("Test")
     w2 = add_symbol(w.id, "BBCA")
     assert w2.entries[0].name
-    w3 = refresh_metadata(w.id)
+    w3 = refresh_metadata(w.id, live=False)
     assert w3.entries[0].name
     assert w3.entries[0].last_synced
     _cleanup()
@@ -455,7 +455,7 @@ def test_refresh_metadata():
 def test_refresh_metadata_invalid_id():
     _clean()
     try:
-        refresh_metadata("nonexistent")
+        refresh_metadata("nonexistent", live=False)
         assert False, "should raise"
     except ValueError:
         pass
@@ -468,7 +468,7 @@ def test_refresh_all():
     w2 = create("B")
     add_symbol(w1.id, "BBCA")
     add_symbol(w2.id, "BBRI")
-    results = refresh_all()
+    results = refresh_all(live=False)
     assert len(results) == 3
     for r in results:
         assert "id" in r
@@ -478,7 +478,7 @@ def test_refresh_all():
 
 def test_refresh_all_empty_watchlist():
     _clean()
-    results = refresh_all()
+    results = refresh_all(live=False)
     assert len(results) == 1
     _cleanup()
 
@@ -487,7 +487,7 @@ def test_sync_updates_valid_flag():
     _clean()
     w = create("Test")
     add_symbol(w.id, "BBCA")
-    w2 = refresh_metadata(w.id)
+    w2 = refresh_metadata(w.id, live=False)
     assert w2.entries[0].valid is True
     _cleanup()
 
