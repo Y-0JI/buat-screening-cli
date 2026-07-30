@@ -1,18 +1,16 @@
-import json
-import os
 from app.services.watchlist import (
-    _DATA_PATH, create, rename, delete, list_all, get_by_id,
+    create, rename, delete, list_all, get_by_id,
     add_symbol, remove_symbol, reorder,
     set_description, add_tag, remove_tag, set_notes, toggle_favorite,
     refresh_metadata, refresh_all,
     query_entries, find_symbol, search_watchlists,
+    reset_data,
 )
 from app.models.watchlist import Watchlist
 
 
 def _clean():
-    if os.path.exists(_DATA_PATH):
-        os.remove(_DATA_PATH)
+    reset_data()
 
 
 def test_create():

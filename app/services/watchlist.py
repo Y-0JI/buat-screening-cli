@@ -3,9 +3,9 @@ import os
 from datetime import datetime, timezone
 
 from app.models.watchlist import Watchlist, WatchlistEntry
+from app.storage import get_backend
 from app.validation import normalize
 
-_DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "watchlists.json")
 _STOCKS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "idx_stocks.json")
 
 
@@ -23,15 +23,15 @@ def _stock_metadata(ticker: str) -> dict:
 
 
 def _load() -> list[dict]:
-    if not os.path.exists(_DATA_PATH):
-        return []
-    with open(_DATA_PATH) as f:
-        return json.load(f)
+    return get_backend().load()
 
 
 def _save(data: list[dict]) -> None:
-    with open(_DATA_PATH, "w") as f:
-        json.dump(data, f, indent=2)
+    get_backend().save(data)
+
+
+def reset_data() -> None:
+    _save([])
 
 
 def _to_model(d: dict) -> Watchlist:
