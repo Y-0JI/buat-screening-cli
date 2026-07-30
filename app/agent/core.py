@@ -92,7 +92,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     system_prompt = _load_prompt("system.md")
     store = get_store()
-    memory_block = store.serialize_for_prompt(ticker=",".join(tickers))
+    memory_block = store.serialize_for_prompt()
     if memory_block:
         system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
     else:

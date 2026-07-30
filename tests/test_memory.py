@@ -85,6 +85,24 @@ def test_get_relevant():
     assert "BBCA" in r[0].content
 
 
+def test_get_relevant_no_match():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik", source="BBCA")
+    r = store.get_relevant("TIDAKADA")
+    assert r == []
+
+
+def test_get_relevant_multi_word_tight():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "saham bank bagus", source="BANK")
+    r = store.get_relevant("saham bank")
+    assert len(r) == 1
+    assert r[0].source == "BANK"
+
+
 def test_add_or_update_updates_existing():
     store = MemoryStore(path="/tmp/test_memory.json")
     store.clear()

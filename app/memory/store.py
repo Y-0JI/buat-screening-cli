@@ -97,7 +97,10 @@ class MemoryStore:
             return []
         words = [w.lower() for w in query.split()]
         entries = self.get_all()
-        matched = [e for e in entries if any(w in e.content.lower() or (e.source and w in e.source.lower()) for w in words)]
+        if len(words) == 1:
+            matched = [e for e in entries if any(w in e.content.lower() or (e.source and w in e.source.lower()) for w in words)]
+        else:
+            matched = [e for e in entries if all(w in e.content.lower() or (e.source and w in e.source.lower()) for w in words)]
         matched.sort(key=lambda e: e.created_at, reverse=True)
         return matched[:limit]
 
