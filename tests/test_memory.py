@@ -77,3 +77,31 @@ def test_serialize_empty():
     store = MemoryStore(path="/tmp/test_memory_empty.json")
     store.clear()
     assert store.serialize_for_prompt() == ""
+
+
+def test_corrupt_file():
+    path = "/tmp/test_memory_corrupt.json"
+    with open(path, "w") as f:
+        f.write("{invalid json}}")
+    store = MemoryStore(path=path)
+    assert store.get_all() == []
+    assert store.count() == 0
+
+
+def test_fresh_installation():
+    path = "/tmp/test_fresh/memory.json"
+    store = MemoryStore(path=path)
+    store.add(MemoryType.RESEARCH_FINDING, "test")
+    assert store.count() == 1
+    import shutil
+    shutil.rmtree("/tmp/test_fresh", ignore_errors=True)
+
+
+def test_atomic_write_resilience():
+    path = "/tmp/test_atomic_memory.json"
+    store = MemoryStore(path=path)
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "entry1")
+    assert os.path.exists(path)
+    store.add(MemoryType.RESEARCH_FINDING, "entry2")
+    assert store.count() == 2

@@ -2,6 +2,7 @@ import json
 import os
 from datetime import datetime, timezone
 
+from loguru import logger
 from app.memory.models import MemoryEntry, MemoryType
 
 _DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "ai_memory.json")
@@ -34,14 +35,21 @@ class MemoryStore:
     def get_all(self) -> list[MemoryEntry]:
         if not os.path.exists(self._path):
             return []
-        with open(self._path) as f:
-            data = json.load(f)
+        try:
+            with open(self._path) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, ValueError, KeyError, TypeError) as exc:
+            logger.warning(f"Corrupt memory file, starting fresh: {exc}")
+            return []
         entries = []
         for e in data.get("entries", []):
-            e["type"] = MemoryType(e["type"])
-            e["created_at"] = datetime.fromisoformat(e["created_at"])
-            e["updated_at"] = datetime.fromisoformat(e["updated_at"])
-            entries.append(MemoryEntry(**e))
+            try:
+                e["type"] = MemoryType(e["type"])
+                e["created_at"] = datetime.fromisoformat(e["created_at"])
+                e["updated_at"] = datetime.fromisoformat(e["updated_at"])
+                entries.append(MemoryEntry(**e))
+            except (ValueError, KeyError, TypeError) as exc:
+                logger.warning(f"Skipping corrupt memory entry {e.get('id', '?' )}: {exc}")
         return entries
 
     def forget(self, entry_id: str) -> bool:
@@ -78,8 +86,11 @@ class MemoryStore:
                 for e in entries
             ],
         }
-        with open(self._path, "w") as f:
+        os.makedirs(os.path.dirname(self._path), exist_ok=True)
+        tmp = self._path + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(data, f, indent=2)
+        os.replace(tmp, self._path)
 
     def serialize_for_prompt(self, limit: int = 10) -> str:
         entries = self.get_recent(limit)
