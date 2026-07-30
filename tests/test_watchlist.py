@@ -7,7 +7,7 @@ from app.services.watchlist import (
     set_description, add_tag, remove_tag, set_notes, toggle_favorite,
     refresh_metadata, refresh_all,
     query_entries, find_symbol, search_watchlists,
-    reset_data,
+    reset_data, resolve_id,
 )
 from app.models.watchlist import Watchlist
 from app.storage import set_test_backend
@@ -651,6 +651,33 @@ def test_rename_ke_nama_orang_lain_tetap_ditolak():
     w2 = create("B")
     try:
         rename(w2.id, "A")
+        assert False, "should raise"
+    except ValueError:
+        pass
+    _cleanup()
+
+
+def test_resolve_id_by_id():
+    _clean()
+    w = create("Test")
+    resolved = resolve_id(w.id)
+    assert resolved == w.id
+    _cleanup()
+
+
+def test_resolve_id_by_name():
+    _clean()
+    w = create("Test")
+    resolved = resolve_id("Test")
+    assert resolved == w.id
+    _cleanup()
+
+
+def test_resolve_id_not_found():
+    _clean()
+    create("Test")
+    try:
+        resolve_id("nonexistent")
         assert False, "should raise"
     except ValueError:
         pass

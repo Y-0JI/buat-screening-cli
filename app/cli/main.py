@@ -28,6 +28,7 @@ from app.services.watchlist import (
     query_entries as wl_query,
     find_symbol as wl_find,
     search_watchlists as wl_search,
+    resolve_id as wl_resolve,
 )
 from app.validation import normalize, validate as validate_symbol
 from typing import Optional
@@ -290,6 +291,7 @@ def create(name: str) -> None:
 @watchlist_cmd.command()
 def rename(wl_id: str, new_name: str) -> None:
     """Ganti nama watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_rename(wl_id, new_name)
         console.print(f"[green]✓[/green] Watchlist diganti jadi [bold]'{w.name}'[/bold]")
@@ -300,6 +302,7 @@ def rename(wl_id: str, new_name: str) -> None:
 @watchlist_cmd.command()
 def delete(wl_id: str) -> None:
     """Hapus watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         wl_delete(wl_id)
         console.print(f"[green]✓[/green] Watchlist dihapus")
@@ -364,6 +367,7 @@ def show(
     reverse: bool = typer.Option(False, "--reverse", "-r", help="Urutan terbalik"),
 ) -> None:
     """Tampilkan isi watchlist dengan opsi cari, filter, urut."""
+    wl_id = wl_resolve(wl_id)
     try:
         if search or sector or valid is not None or sort:
             w = wl_query(wl_id, search=search, sector=sector, valid=valid, sort_by=sort, sort_reverse=reverse)
@@ -402,6 +406,7 @@ def find(
 @watchlist_cmd.command()
 def add(wl_id: str, ticker: str) -> None:
     """Tambah simbol ke watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_add(wl_id, ticker)
         t = normalize(ticker)
@@ -413,6 +418,7 @@ def add(wl_id: str, ticker: str) -> None:
 @watchlist_cmd.command()
 def remove(wl_id: str, ticker: str) -> None:
     """Hapus simbol dari watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_remove(wl_id, ticker)
         t = normalize(ticker)
@@ -424,6 +430,7 @@ def remove(wl_id: str, ticker: str) -> None:
 @watchlist_cmd.command()
 def reorder(wl_id: str, tickers: str) -> None:
     """Ubah urutan simbol (pisah koma)."""
+    wl_id = wl_resolve(wl_id)
     try:
         ticker_list = [t.strip() for t in tickers.split(",") if t.strip()]
         w = wl_reorder(wl_id, ticker_list)
@@ -435,6 +442,7 @@ def reorder(wl_id: str, tickers: str) -> None:
 @watchlist_cmd.command()
 def describe(wl_id: str, description: str) -> None:
     """Atur deskripsi watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_desc(wl_id, description)
         console.print(f"[green]✓[/green] Deskripsi [bold]'{w.name}'[/bold] diperbarui")
@@ -445,6 +453,7 @@ def describe(wl_id: str, description: str) -> None:
 @watchlist_cmd.command()
 def tag(wl_id: str, tag: str) -> None:
     """Tambah tag ke watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_tag_add(wl_id, tag)
         console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] ditambahkan ke [bold]'{w.name}'[/bold]")
@@ -455,6 +464,7 @@ def tag(wl_id: str, tag: str) -> None:
 @watchlist_cmd.command()
 def untag(wl_id: str, tag: str) -> None:
     """Hapus tag dari watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_tag_remove(wl_id, tag)
         console.print(f"[green]✓[/green] Tag [cyan]{tag}[/cyan] dihapus dari [bold]'{w.name}'[/bold]")
@@ -465,6 +475,7 @@ def untag(wl_id: str, tag: str) -> None:
 @watchlist_cmd.command()
 def notes(wl_id: str, notes: str) -> None:
     """Atur catatan watchlist."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_notes(wl_id, notes)
         console.print(f"[green]✓[/green] Catatan [bold]'{w.name}'[/bold] diperbarui")
@@ -475,6 +486,7 @@ def notes(wl_id: str, notes: str) -> None:
 @watchlist_cmd.command()
 def favorite(wl_id: str) -> None:
     """Tandai/hapus status favorit."""
+    wl_id = wl_resolve(wl_id)
     try:
         w = wl_fav(wl_id)
         status = "[yellow]★[/yellow] favorit" if w.favorite else "bukan favorit"
@@ -488,6 +500,8 @@ def sync(
     wl_id: str = typer.Argument("", help="ID watchlist (kosongkan untuk semua)"),
 ) -> None:
     """Sinkronkan metadata simbol dengan data terbaru."""
+    if wl_id:
+        wl_id = wl_resolve(wl_id)
     try:
         if wl_id:
             w = wl_sync(wl_id)
