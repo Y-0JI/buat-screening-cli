@@ -31,6 +31,7 @@ from app.services.watchlist import (
     resolve_id as wl_resolve,
 )
 from app.validation import normalize, validate as validate_symbol
+from app.memory import get_store
 from typing import Optional
 
 _p = RichPresenter()
@@ -606,6 +607,48 @@ def _print_bulk_change(results: list[dict], title: str = "Top", invalid: list[st
         console.print(f"[dim]{len(invalid)} ticker tidak ditemukan[/dim]")
     if failed:
         console.print(f"[yellow]⚠ {len(failed)} saham gagal diproses[/yellow]")
+
+
+memory_cmd = typer.Typer()
+app.add_typer(memory_cmd, name="memory", help="Kelola memori AI")
+
+
+@memory_cmd.command(name="show")
+def memory_show(limit: int = typer.Option(20, "--limit", "-n", help="Jumlah maksimal")) -> None:
+    """Tampilkan memori AI."""
+    store = get_store()
+    entries = store.get_recent(limit)
+    if not entries:
+        console.print("[yellow]Belum ada memori.[/yellow]")
+        return
+    from rich.table import Table
+    table = Table(title="Memori AI")
+    table.add_column("No", style="dim")
+    table.add_column("Tipe")
+    table.add_column("Konten")
+    table.add_column("Sumber")
+    table.add_column("Waktu")
+    for i, e in enumerate(entries, 1):
+        table.add_row(str(i), e.type.value, e.content[:60], e.source or "-", e.created_at.strftime("%d/%m %H:%M"))
+    console.print(table)
+
+
+@memory_cmd.command()
+def clear() -> None:
+    """Hapus semua memori."""
+    store = get_store()
+    store.clear()
+    console.print("[green]✓[/green] Semua memori dihapus")
+
+
+@memory_cmd.command()
+def forget(entry_id: str) -> None:
+    """Hapus satu entry memori berdasarkan ID."""
+    store = get_store()
+    if store.forget(entry_id):
+        console.print(f"[green]✓[/green] Entry [cyan]{entry_id}[/cyan] dihapus")
+    else:
+        console.print(f"[red]✗[/red] Entry [cyan]{entry_id}[/cyan] tidak ditemukan")
 
 
 if __name__ == "__main__":
