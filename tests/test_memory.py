@@ -103,6 +103,33 @@ def test_get_relevant_multi_word_tight():
     assert r[0].source == "BANK"
 
 
+def test_get_relevant_multi_word_mixed_fields():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "saham bank bagus", source="BANK")
+    r = store.get_relevant("BBCA laba")
+    assert len(r) == 1
+    assert r[0].source == "BBCA"
+
+
+def test_get_relevant_multi_word_duplicate_content():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba turun 5%", source="BBCA")
+    r = store.get_relevant("BBCA laba")
+    assert len(r) == 2
+
+
+def test_get_relevant_multi_word_unknown_ticker():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    r = store.get_relevant("XYZB laba")
+    assert r == []
+
+
 def test_add_or_update_updates_existing():
     store = MemoryStore(path="/tmp/test_memory.json")
     store.clear()
