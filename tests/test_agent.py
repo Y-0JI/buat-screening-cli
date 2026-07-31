@@ -200,6 +200,51 @@ def test_research_failed_no_memory_entry():
     assert store.count() == 0
 
 
+def test_screening_prompt_rendered_cleanly():
+    from app.agent.research import _render_report_prompt
+    from app.parser.intent import ResearchIntent
+    from app.screeners.engine import ScreeningResult
+    scr = [
+        {"ticker": "BBCA", "sector": "Financials", "top_signal": ScreeningResult(ticker="BBCA", signal="BUY", confidence=0.85, reason="harga di atas EMA20"), "max_confidence": 0.85},
+        {"ticker": "BBRI", "sector": "Financials", "top_signal": None, "max_confidence": 0},
+    ]
+    prompt = _render_report_prompt("{{context}}", ResearchIntent("sector_theme", [], None, "q"), scr, None, None, {})
+    assert "if ts else" not in prompt
+    assert "- BBCA (Financials): BUY (85%) - harga di atas EMA20" in prompt
+    assert "- BBRI (Financials): N/A" in prompt
+
+
+def test_extract_sections_variants():
+    from app.agent.research import _extract_sections
+    variants = [
+        ("# Ringkasan Eksekutif\nBBCA kuat.\n# Rekomendasi\n1. hold\n2. beli", "BBCA kuat.", ["hold", "beli"]),
+        ("## Kesimpulan\nBBCA layak.\n## Rekomendasi:\n- hold", "BBCA layak.", ["hold"]),
+        ("Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold", "BBCA bagus", ["hold"]),
+        ("**Ringkasan Eksekutif:** BBCA solid\n**Rekomendasi:** hold dan watchlist", "BBCA solid", ["hold dan watchlist"]),
+    ]
+    for text, expected_summary, expected_recs in variants:
+        s = _extract_sections(text)
+        assert s["summary"] == expected_summary, text
+        assert s["recommendations"] == expected_recs, text
+
+
+def test_extract_sections_no_false_positive():
+    from app.agent.research import _extract_sections
+    s = _extract_sections("kalimat biasa dengan kata ringkasan di tengah.\n## Rekomendasi\n1. hold")
+    assert s["summary"] == "", "kata kunci di tengah kalimat tidak boleh memicu section"
+    assert s["recommendations"] == ["hold"]
+
+
+def test_trim_analysis_keeps_head_and_tail():
+    from app.agent.research import _trim_analysis
+    long = "A" * 400 + "B" * 1000 + "C" * 400
+    trimmed = _trim_analysis(long)
+    assert len(trimmed) <= 840, "blok analisis harus dibatasi secara konsisten"
+    assert trimmed.startswith("A" * 400) and trimmed.endswith("C" * 400), "kepala dan ekor harus utuh"
+    assert "dipotong" in trimmed, "harus ada penanda pemotongan"
+    assert _trim_analysis("pendek") == "pendek"
+
+
 def _mock_stock_data(days: int = 30):
     from datetime import date, timedelta
     from app.models.stock import HistoricalPrice, StockData, StockInfo
