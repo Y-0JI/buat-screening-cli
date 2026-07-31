@@ -167,38 +167,33 @@ def test_compare_invalid_ticker():
     assert result.exit_code != 0
 
 
-def _research_report(failed, analyses, screening=None):
-    from app.agent.research import ResearchReport
-    from app.parser.intent import ResearchIntent
-    intent = ResearchIntent("single_stock", ["BBCA"], None, "analisa BBCA")
-    return ResearchReport(
-        intent=intent,
-        screening_results=screening,
-        analyses=analyses,
-        comparison=None,
-        data_quality={},
-        recommendations=["hold"],
-        executive_summary="tes",
-        failed=failed,
-    )
+def _mock_fetch_partial_fail(ticker, *args, **kwargs):
+    return MOCK_DATA.get(ticker.upper()) if ticker.upper() != "BBRI" else None
 
 
-def _fake_analysis():
-    from app.models.analysis import AIAnalysis
-    return AIAnalysis(ticker="BBCA", summary="Ringkasan BBCA")
-
-
-@patch("app.cli.main.run_research", return_value=_research_report(failed=["BBCA"], analyses=None))
-def test_research_single_stock_failure_exits_nonzero(mock_research):
-    result = runner.invoke(app, ["research", "analisa BBCA"])
+@patch("app.agent.research.chat_completion")
+@patch("app.agent.core.chat_completion")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_research_single_stock_failure_exits_nonzero_no_ai(mock_fetch, mock_llm_core, mock_llm_research):
+    result = runner.invoke(app, ["research", "analisa XYZY"])
     assert result.exit_code != 0
+    mock_llm_core.assert_not_called()
+    mock_llm_research.assert_not_called()
 
 
-@patch("app.cli.main.run_research", return_value=_research_report(failed=["BBRI"], analyses={"BBCA": _fake_analysis()}))
-def test_research_partial_failure_still_renders(mock_research):
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch_partial_fail)
+def test_research_compare_partial_failure_renders(mock_fetch, mock_llm_core, mock_llm_research):
     result = runner.invoke(app, ["research", "bandingkan BBCA dan BBRI"])
     assert result.exit_code == 0
     assert "BBRI" in result.output
+
+
+def test_research_unsupported_query():
+    result = runner.invoke(app, ["research", "gainers"])
+    assert result.exit_code == 0
+    assert "bukan permintaan riset" in result.output
 
 
 def _setup_wl_backend():
