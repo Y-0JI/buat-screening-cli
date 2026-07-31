@@ -132,10 +132,7 @@ def compare(
     if result["type"] == "error":
         _p.error(result["message"])
         raise typer.Exit(1)
-    if result.get("analysis"):
-        console.print(result["analysis"])
-    else:
-        _p.error("Analisis tidak tersedia")
+    _p.comparison(result)
 
 
 @app.command()
@@ -244,6 +241,9 @@ def natural(query: str) -> None:
 def research(query: str) -> None:
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
         report = run_research(query)
+    if report.failed and not report.analyses and not report.screening_results:
+        _p.error(f"Data tidak ditemukan: {', '.join(report.failed)}")
+        raise typer.Exit(1)
     _p.research_report(report)
 
 

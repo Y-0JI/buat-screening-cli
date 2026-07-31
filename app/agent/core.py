@@ -27,6 +27,16 @@ def _render_template(template: str, **kwargs) -> str:
     return template
 
 
+def _build_system_prompt(ticker: str = "") -> str:
+    system_prompt = _load_prompt("system.md")
+    memory_block = get_store().serialize_for_prompt(ticker=ticker)
+    return system_prompt.replace("{{MEMORY}}", memory_block)
+
+
+def _render_caveats(caveats: list[str]) -> str:
+    return "\n".join(f"- {c}" for c in caveats) or "Tidak ada keterbatasan."
+
+
 def analyze_with_ai(ticker: str) -> AIAnalysis:
     t = normalize(ticker)
     data = fetch_stock(t)
@@ -34,23 +44,18 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
         return AIAnalysis(ticker=t, summary="Data tidak ditemukan", conclusion="Gagal mengambil data")
 
     ctx = build_context(data)
+    ctx["data_caveats"] = _render_caveats(ctx["data_caveats"])
     prompt = _load_prompt("analysis.md")
     filled = _render_template(prompt, **ctx)
 
-    system_prompt = _load_prompt("system.md")
-    store = get_store()
-    memory_block = store.serialize_for_prompt(ticker=t)
-    if memory_block:
-        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
-    else:
-        system_prompt = system_prompt.replace("{{MEMORY}}", "")
+    system_prompt = _build_system_prompt(ticker=t)
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
     ], temperature=0)
 
     if llm_result:
-        store.add_or_update(MemoryType.RESEARCH_FINDING, f"{t}: {llm_result.split(chr(10))[0][:120]}", source=t)
+        get_store().add_or_update(MemoryType.RESEARCH_FINDING, f"{t}: {llm_result.split(chr(10))[0][:120]}", source=t)
         return AIAnalysis(
             ticker=t,
             summary=llm_result,
@@ -85,18 +90,12 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     prompt_template = _load_prompt("comparison.md")
     stocks_text = "\n".join(
-        f"- {r['ticker']}: Harga {r['price']}, Perubahan {r['change']}, Indikator {r['indicators']}, Screening {r['screening']}"
+        f"- {r['ticker']}: Harga {r['price']}, Perubahan {r['change']}, Indikator {r['indicators']}, Screening {r['screening']}\n  Keterbatasan Data: {_render_caveats(r['data_caveats'])}"
         for r in results
     )
     filled = prompt_template.replace("{{stocks}}", stocks_text)
 
-    system_prompt = _load_prompt("system.md")
-    store = get_store()
-    memory_block = store.serialize_for_prompt()
-    if memory_block:
-        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
-    else:
-        system_prompt = system_prompt.replace("{{MEMORY}}", "")
+    system_prompt = _build_system_prompt()
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
@@ -104,7 +103,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
     if llm_result:
-        store.add_or_update(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
+        get_store().add_or_update(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
     if failed:
         analysis += f"\n\n⚠ Tidak dapat memuat data: {', '.join(failed)}"
 
@@ -117,13 +116,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
 
 def ask_llm(user_query: str, context: str = "", messages: list[dict] | None = None) -> str | None:
-    system_prompt = _load_prompt("system.md")
-    store = get_store()
-    memory_block = store.serialize_for_prompt()
-    if memory_block:
-        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
-    else:
-        system_prompt = system_prompt.replace("{{MEMORY}}", "")
+    system_prompt = _build_system_prompt()
     if messages is not None:
         if not any(m.get("role") == "system" for m in messages):
             messages = [{"role": "system", "content": system_prompt}] + messages

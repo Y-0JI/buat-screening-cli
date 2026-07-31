@@ -71,6 +71,7 @@ def test_info_command():
 def test_compare_comma(mock_fetch):
     result = runner.invoke(app, ["compare", "BBCA,BBRI"])
     assert result.exit_code == 0
+    assert "Perbandingan" in result.output
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
@@ -164,6 +165,40 @@ def test_score_invalid_ticker():
 def test_compare_invalid_ticker():
     result = runner.invoke(app, ["compare", "BBCA", "ABCDEFGHIJK"])
     assert result.exit_code != 0
+
+
+def _research_report(failed, analyses, screening=None):
+    from app.agent.research import ResearchReport
+    from app.parser.intent import ResearchIntent
+    intent = ResearchIntent("single_stock", ["BBCA"], None, "analisa BBCA")
+    return ResearchReport(
+        intent=intent,
+        screening_results=screening,
+        analyses=analyses,
+        comparison=None,
+        data_quality={},
+        recommendations=["hold"],
+        executive_summary="tes",
+        failed=failed,
+    )
+
+
+def _fake_analysis():
+    from app.models.analysis import AIAnalysis
+    return AIAnalysis(ticker="BBCA", summary="Ringkasan BBCA")
+
+
+@patch("app.cli.main.run_research", return_value=_research_report(failed=["BBCA"], analyses=None))
+def test_research_single_stock_failure_exits_nonzero(mock_research):
+    result = runner.invoke(app, ["research", "analisa BBCA"])
+    assert result.exit_code != 0
+
+
+@patch("app.cli.main.run_research", return_value=_research_report(failed=["BBRI"], analyses={"BBCA": _fake_analysis()}))
+def test_research_partial_failure_still_renders(mock_research):
+    result = runner.invoke(app, ["research", "bandingkan BBCA dan BBRI"])
+    assert result.exit_code == 0
+    assert "BBRI" in result.output
 
 
 def _setup_wl_backend():
