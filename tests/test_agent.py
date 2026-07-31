@@ -99,13 +99,36 @@ def test_research_memory_injected():
                 _assert_no_memory_placeholder(mock_llm.call_args.args[0])
 
 
-def _mock_stock_data():
-    from datetime import date
+def test_analyze_caveats_rendered_cleanly():
+    with patch("app.agent.core.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data()
+        with patch("app.agent.core.chat_completion") as mock_llm:
+            mock_llm.return_value = "BBCA ok."
+            analyze_with_ai("BBCA")
+            user_msg = mock_llm.call_args.args[0][1]["content"]
+            assert "Keterbatasan Data:" in user_msg
+            assert "- " in user_msg
+            assert "{%" not in user_msg
+
+
+def test_analyze_caveats_default_when_none():
+    with patch("app.agent.core.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data(days=250)
+        with patch("app.agent.core.chat_completion") as mock_llm:
+            mock_llm.return_value = "BBCA ok."
+            analyze_with_ai("BBCA")
+            user_msg = mock_llm.call_args.args[0][1]["content"]
+            assert "Tidak ada keterbatasan" in user_msg
+
+
+def _mock_stock_data(days: int = 30):
+    from datetime import date, timedelta
     from app.models.stock import HistoricalPrice, StockData, StockInfo
+    base = date.today() - timedelta(days=days)
     return StockData(
         info=StockInfo(ticker="BBCA", name="Test Bank", sector="Finance", market_cap=1e12),
         history=[
-            HistoricalPrice(date=date(2024, 1, i + 1), open=100.0, high=101.0, low=99.0, close=100.0 + i, volume=1_000_000)
-            for i in range(30)
+            HistoricalPrice(date=base + timedelta(days=i), open=100.0, high=101.0, low=99.0, close=100.0 + i, volume=1_000_000)
+            for i in range(days)
         ],
     )

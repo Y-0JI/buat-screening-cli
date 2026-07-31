@@ -33,6 +33,10 @@ def _build_system_prompt(ticker: str = "") -> str:
     return system_prompt.replace("{{MEMORY}}", memory_block)
 
 
+def _render_caveats(caveats: list[str]) -> str:
+    return "\n".join(f"- {c}" for c in caveats) or "Tidak ada keterbatasan."
+
+
 def analyze_with_ai(ticker: str) -> AIAnalysis:
     t = normalize(ticker)
     data = fetch_stock(t)
@@ -40,6 +44,7 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
         return AIAnalysis(ticker=t, summary="Data tidak ditemukan", conclusion="Gagal mengambil data")
 
     ctx = build_context(data)
+    ctx["data_caveats"] = _render_caveats(ctx["data_caveats"])
     prompt = _load_prompt("analysis.md")
     filled = _render_template(prompt, **ctx)
 

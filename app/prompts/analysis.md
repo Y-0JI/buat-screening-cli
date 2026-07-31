@@ -9,9 +9,7 @@ DATA:
 - Indikator: {{indicators}}
 - Screening: {{screening}}
 - Kualitas Data: {{data_quality}}
-{% if data_caveats %}
 - Keterbatasan Data: {{data_caveats}}
-{% endif %}
 
 Panduan:
 1. Mulai dengan ringkasan kondisi saat ini.
