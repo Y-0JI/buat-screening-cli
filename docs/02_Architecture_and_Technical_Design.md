@@ -76,6 +76,37 @@ Terminal
 ## Data Source
 - Yahoo Finance / yfinance
 
+
+## Multiple Data Provider Strategy
+
+Untuk menjaga arsitektur tetap modular dan provider agnostic, sistem
+dirancang agar dapat menggunakan lebih dari satu data provider melalui
+tool abstraction.
+
+### Current Provider
+
+- Yahoo Finance / yfinance
+
+### Future Provider
+
+- IDX API
+- Additional providers apabila diperlukan di masa mendatang.
+
+### Design Principles
+
+- AI Agent tidak berkomunikasi langsung dengan data provider.
+- Seluruh akses data dilakukan melalui tool abstraction.
+- Penambahan provider baru tidak boleh mengubah business logic maupun AI Agent.
+- AI dapat menggunakan satu atau beberapa provider sesuai kebutuhan analisis.
+- Setiap provider harus memiliki antarmuka yang konsisten agar mudah dipertukarkan.
+
+### Expected Benefits
+
+- Meningkatkan ketersediaan data.
+- Memungkinkan penggunaan data resmi maupun data pelengkap.
+- Mengurangi ketergantungan terhadap satu provider.
+- Mempermudah ekspansi engine di masa depan tanpa mengubah arsitektur utama.
+
 ## CLI UI
 - Rich
 
