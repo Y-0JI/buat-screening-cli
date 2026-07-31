@@ -132,10 +132,7 @@ def compare(
     if result["type"] == "error":
         _p.error(result["message"])
         raise typer.Exit(1)
-    if result.get("analysis"):
-        console.print(result["analysis"])
-    else:
-        _p.error("Analisis tidak tersedia")
+    _p.comparison(result)
 
 
 @app.command()

@@ -71,6 +71,7 @@ def test_info_command():
 def test_compare_comma(mock_fetch):
     result = runner.invoke(app, ["compare", "BBCA,BBRI"])
     assert result.exit_code == 0
+    assert "Perbandingan" in result.output
 
 
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)

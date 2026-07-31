@@ -31,6 +31,10 @@ class RichPresenter:
         if analysis.screening_results:
             self._print_screening_results(analysis.screening_results)
 
+    def comparison(self, result: dict) -> None:
+        if result.get("analysis"):
+            console.print(Panel(result["analysis"], title="[bold]Perbandingan[/bold]", border_style="magenta"))
+
     def research_report(self, report) -> None:
         console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
         console.print(f"[bold]Query:[/bold] {report.intent.raw_query}")
@@ -63,7 +67,7 @@ class RichPresenter:
                 console.print()
 
         if report.comparison and report.comparison.get("analysis"):
-            console.print(Panel(report.comparison["analysis"], title="[bold]Perbandingan[/bold]", border_style="magenta"))
+            self.comparison(report.comparison)
             console.print()
 
         if report.recommendations:
