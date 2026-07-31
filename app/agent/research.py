@@ -5,6 +5,8 @@ from app.router.engine import fetch_stock, bulk_screen, build_context
 from app.services.llm import chat_completion
 from app.services.stock_list import get_all
 from app.parser.intent import detect_research_intent, ResearchIntent
+from app.memory import get_store
+from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
 
 
@@ -120,6 +122,14 @@ def run_research(query: str) -> ResearchReport:
         executive_summary = "Laporan riset otomatis berdasarkan data terkini."
     if not recommendations:
         recommendations = ["Lakukan analisis manual lebih lanjut sebelum keputusan investasi."]
+
+    if llm_result:
+        recs = "; ".join(recommendations[:3])
+        get_store().add_or_update(
+            MemoryType.RESEARCH_FINDING,
+            f"Riset {intent.type} '{query[:50]}': {executive_summary.strip()[:150]} Rekomendasi: {recs[:150]}",
+            source="research",
+        )
 
     return ResearchReport(
         intent=intent,

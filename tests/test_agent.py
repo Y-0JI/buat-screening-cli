@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
@@ -162,6 +163,41 @@ def test_research_compare_partial_sends_all_tickers():
                         report = run_research("bandingkan BBCA dan BBRI")
                         assert report.failed == ["BBRI"]
                         mock_compare.assert_called_once_with(["BBCA", "BBRI"])
+
+
+def test_research_saves_summary_to_memory():
+    import tempfile
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.research.get_store", return_value=store):
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = _mock_stock_data()
+            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
+                with patch("app.agent.research.chat_completion") as mock_llm:
+                    mock_llm.return_value = "Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold"
+                    run_research("analisa BBCA")
+    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source == "research"]
+    assert entries, "riset sukses harus menyimpan entri memori"
+    assert "Riset single_stock" in entries[0].content
+
+
+def test_research_failed_no_memory_entry():
+    import tempfile
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.research.get_store", return_value=store):
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = None
+            with patch("app.agent.research.chat_completion") as mock_llm:
+                run_research("analisa XYZY")
+                mock_llm.assert_not_called()
+    assert store.count() == 0
 
 
 def _mock_stock_data(days: int = 30):

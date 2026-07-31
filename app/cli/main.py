@@ -32,6 +32,7 @@ from app.services.watchlist import (
 )
 from app.validation import normalize, validate as validate_symbol
 from app.memory import get_store
+from app.memory.models import MemoryType
 from typing import Optional
 
 _p = RichPresenter()
@@ -269,6 +270,9 @@ def chat() -> None:
         except (EOFError, KeyboardInterrupt):
             console.print()
             break
+    if messages:
+        tail = " | ".join(f"{m['role']}: {m['content'][:200]}" for m in messages[-6:])
+        get_store().add_or_update(MemoryType.IMPORTANT_CONTEXT, f"Percakapan terakhir: {tail}", source="chat")
 
 
 @app.command()

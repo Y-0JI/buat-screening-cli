@@ -196,6 +196,35 @@ def test_research_unsupported_query():
     assert "bukan permintaan riset" in result.output
 
 
+def test_chat_saves_last_exchanges_to_memory():
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm", return_value="jawaban AI"):
+            result = runner.invoke(app, ["chat"], input="halo\napa kabar\nexit\n")
+    assert result.exit_code == 0
+    entries = [e for e in store.get_all() if e.type == MemoryType.IMPORTANT_CONTEXT and e.source == "chat"]
+    assert entries, "sesi chat berisi percakapan harus menyimpan jejak"
+    assert "halo" in entries[0].content
+    assert "jawaban AI" in entries[0].content
+
+
+def test_chat_empty_no_memory():
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm") as mock_llm:
+            result = runner.invoke(app, ["chat"], input="exit\n")
+    assert result.exit_code == 0
+    mock_llm.assert_not_called()
+    assert store.count() == 0
+
+
 def _setup_wl_backend():
     fd, path = tempfile.mkstemp(suffix=".json", prefix="watchlist_cli_test_")
     os.close(fd)
