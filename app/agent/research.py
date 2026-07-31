@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 from app.agent.core import analyze_with_ai, compare_with_ai, _load_prompt, _build_system_prompt
 from app.router.engine import fetch_stock, bulk_screen, build_context
@@ -17,6 +17,7 @@ class ResearchReport:
     data_quality: dict[str, list[str]]
     recommendations: list[str]
     executive_summary: str
+    failed: list[str] = field(default_factory=list)
 
 
 def run_research(query: str) -> ResearchReport:
@@ -26,6 +27,7 @@ def run_research(query: str) -> ResearchReport:
     analyses = None
     comparison = None
     data_quality = {}
+    failed = []
 
     if intent.type == "sector_theme":
         all_tickers = [s["ticker"] for s in get_all()]
@@ -54,9 +56,7 @@ def run_research(query: str) -> ResearchReport:
             data_quality[t] = ctx.get("data_caveats", [])
             analyses = {t: analyze_with_ai(t)}
         else:
-            from app.models.analysis import AIAnalysis
-            analyses = {t: AIAnalysis(ticker=t, summary="Data tidak ditemukan", conclusion="Gagal mengambil data")}
-            data_quality[t] = ["Data tidak ditemukan"]
+            failed = [t]
 
     elif intent.type == "comparative":
         tickers = intent.tickers[:2]
@@ -67,7 +67,10 @@ def run_research(query: str) -> ResearchReport:
                 ctx = build_context(data)
                 data_quality[t] = ctx.get("data_caveats", [])
                 analyses[t] = analyze_with_ai(t)
-        comparison = compare_with_ai(tickers)
+        if len(analyses) < len(tickers):
+            failed = [t for t in tickers if t not in analyses]
+        if analyses:
+            comparison = compare_with_ai(list(analyses.keys()))
 
     elif intent.type == "analyze_only":
         t = intent.tickers[0] if intent.tickers else ""
@@ -120,6 +123,7 @@ def run_research(query: str) -> ResearchReport:
         data_quality=data_quality,
         recommendations=recommendations,
         executive_summary=executive_summary.strip(),
+        failed=failed,
     )
 
 

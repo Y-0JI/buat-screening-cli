@@ -41,6 +41,10 @@ class RichPresenter:
         console.print(f"[bold]Tipe Riset:[/bold] {report.intent.type}")
         console.print()
 
+        if report.failed:
+            console.print(f"[yellow]⚠ Gagal memuat data: {', '.join(report.failed)}[/yellow]")
+            console.print()
+
         if report.executive_summary:
             console.print(Panel(report.executive_summary, title="[bold]Ringkasan Eksekutif[/bold]", border_style="cyan"))
             console.print()
