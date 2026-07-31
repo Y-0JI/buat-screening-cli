@@ -202,14 +202,31 @@ def test_chat_saves_last_exchanges_to_memory():
     fd, path = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     store = MemoryStore(path=path)
+    questions = [f"pertanyaan {i}" for i in range(1, 6)]
     with patch("app.cli.main.get_store", return_value=store):
-        with patch("app.cli.main.ask_llm", return_value="jawaban AI"):
-            result = runner.invoke(app, ["chat"], input="halo\napa kabar\nexit\n")
+        with patch("app.cli.main.ask_llm", return_value="jawaban AI") as mock_llm:
+            result = runner.invoke(app, ["chat"], input="\n".join(questions) + "\nexit\n")
     assert result.exit_code == 0
+    assert mock_llm.call_count == 5, "penyimpanan memori tidak boleh memicu panggilan AI tambahan"
     entries = [e for e in store.get_all() if e.type == MemoryType.IMPORTANT_CONTEXT and e.source == "chat"]
     assert entries, "sesi chat berisi percakapan harus menyimpan jejak"
-    assert "halo" in entries[0].content
-    assert "jawaban AI" in entries[0].content
+    content = entries[0].content
+    assert "pertanyaan 4" in content and "pertanyaan 5" in content, "ekor percakapan harus tersimpan"
+    assert "jawaban AI" in content
+    assert "pertanyaan 1" not in content, "hanya ekor percakapan yang boleh tersimpan, bukan seluruh riwayat"
+
+
+def test_chat_no_reply_means_no_memory():
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm", return_value=None) as mock_llm:
+            result = runner.invoke(app, ["chat"], input="halo\napa kabar\nexit\n")
+    assert result.exit_code == 0
+    assert mock_llm.call_count == 2, "AI gagal merespon, percakapan tidak terbentuk"
+    assert store.count() == 0, "percakapan tanpa isi tidak boleh membuat entri memori"
 
 
 def test_chat_empty_no_memory():
