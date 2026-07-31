@@ -196,6 +196,53 @@ def test_research_unsupported_query():
     assert "bukan permintaan riset" in result.output
 
 
+def test_chat_saves_last_exchanges_to_memory():
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    questions = [f"pertanyaan {i}" for i in range(1, 6)]
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm", return_value="jawaban AI") as mock_llm:
+            result = runner.invoke(app, ["chat"], input="\n".join(questions) + "\nexit\n")
+    assert result.exit_code == 0
+    assert mock_llm.call_count == 5, "penyimpanan memori tidak boleh memicu panggilan AI tambahan"
+    entries = [e for e in store.get_all() if e.type == MemoryType.IMPORTANT_CONTEXT and e.source == "chat"]
+    assert len(entries) == 1, "satu sesi chat harus menghasilkan tepat satu entri memori"
+    content = entries[0].content
+    assert "pertanyaan 3" in content and "pertanyaan 4" in content and "pertanyaan 5" in content, "3 pertanyaan-jawaban terakhir harus tersimpan"
+    assert "jawaban AI" in content
+    assert "pertanyaan 2" not in content, "batas ekor: Q&A ke-4 dari akhir harus terpotong"
+    assert "pertanyaan 1" not in content, "hanya ekor percakapan yang boleh tersimpan, bukan seluruh riwayat"
+
+
+def test_chat_no_reply_means_no_memory():
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm", return_value=None) as mock_llm:
+            result = runner.invoke(app, ["chat"], input="halo\napa kabar\nexit\n")
+    assert result.exit_code == 0
+    assert mock_llm.call_count == 2, "AI gagal merespon, percakapan tidak terbentuk"
+    assert store.count() == 0, "percakapan tanpa isi tidak boleh membuat entri memori"
+
+
+def test_chat_empty_no_memory():
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.cli.main.get_store", return_value=store):
+        with patch("app.cli.main.ask_llm") as mock_llm:
+            result = runner.invoke(app, ["chat"], input="exit\n")
+    assert result.exit_code == 0
+    mock_llm.assert_not_called()
+    assert store.count() == 0
+
+
 def _setup_wl_backend():
     fd, path = tempfile.mkstemp(suffix=".json", prefix="watchlist_cli_test_")
     os.close(fd)

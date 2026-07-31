@@ -1,3 +1,4 @@
+import os
 from unittest.mock import patch
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
@@ -162,6 +163,86 @@ def test_research_compare_partial_sends_all_tickers():
                         report = run_research("bandingkan BBCA dan BBRI")
                         assert report.failed == ["BBRI"]
                         mock_compare.assert_called_once_with(["BBCA", "BBRI"])
+
+
+def test_research_saves_summary_to_memory():
+    import tempfile
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.research.get_store", return_value=store):
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = _mock_stock_data()
+            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
+                with patch("app.agent.research.chat_completion") as mock_llm:
+                    mock_llm.return_value = "Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold"
+                    run_research("analisa BBCA")
+    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source == "research"]
+    assert entries, "riset sukses harus menyimpan entri memori"
+    assert "Riset single_stock" in entries[0].content
+
+
+def test_research_failed_no_memory_entry():
+    import tempfile
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.research.get_store", return_value=store):
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = None
+            with patch("app.agent.research.chat_completion") as mock_llm:
+                run_research("analisa XYZY")
+                mock_llm.assert_not_called()
+    assert store.count() == 0
+
+
+def test_screening_prompt_rendered_cleanly():
+    from app.agent.research import _render_report_prompt
+    from app.parser.intent import ResearchIntent
+    from app.screeners.engine import ScreeningResult
+    scr = [
+        {"ticker": "BBCA", "sector": "Financials", "top_signal": ScreeningResult(ticker="BBCA", signal="BUY", confidence=0.85, reason="harga di atas EMA20"), "max_confidence": 0.85},
+        {"ticker": "BBRI", "sector": "Financials", "top_signal": None, "max_confidence": 0},
+    ]
+    prompt = _render_report_prompt("{{context}}", ResearchIntent("sector_theme", [], None, "q"), scr, None, None, {})
+    assert "if ts else" not in prompt
+    assert "- BBCA (Financials): BUY (85%) - harga di atas EMA20" in prompt
+    assert "- BBRI (Financials): N/A" in prompt
+
+
+def test_extract_sections_variants():
+    from app.agent.research import _extract_sections
+    variants = [
+        ("# Ringkasan Eksekutif\nBBCA kuat.\n# Rekomendasi\n1. hold\n2. beli", "BBCA kuat.", ["hold", "beli"]),
+        ("## Kesimpulan\nBBCA layak.\n## Rekomendasi:\n- hold", "BBCA layak.", ["hold"]),
+        ("Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold", "BBCA bagus", ["hold"]),
+        ("**Ringkasan Eksekutif:** BBCA solid\n**Rekomendasi:** hold dan watchlist", "BBCA solid", ["hold dan watchlist"]),
+    ]
+    for text, expected_summary, expected_recs in variants:
+        s = _extract_sections(text)
+        assert s["summary"] == expected_summary, text
+        assert s["recommendations"] == expected_recs, text
+
+
+def test_extract_sections_no_false_positive():
+    from app.agent.research import _extract_sections
+    s = _extract_sections("kalimat biasa dengan kata ringkasan di tengah.\n## Rekomendasi\n1. hold")
+    assert s["summary"] == "", "kata kunci di tengah kalimat tidak boleh memicu section"
+    assert s["recommendations"] == ["hold"]
+
+
+def test_trim_analysis_keeps_head_and_tail():
+    from app.agent.research import _trim_analysis
+    long = "A" * 400 + "B" * 1000 + "C" * 400
+    trimmed = _trim_analysis(long)
+    assert len(trimmed) <= 840, "blok analisis harus dibatasi secara konsisten"
+    assert trimmed.startswith("A" * 400) and trimmed.endswith("C" * 400), "kepala dan ekor harus utuh"
+    assert "dipotong" in trimmed, "harus ada penanda pemotongan"
+    assert _trim_analysis("pendek") == "pendek"
 
 
 def _mock_stock_data(days: int = 30):
