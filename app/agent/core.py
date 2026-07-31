@@ -1,5 +1,7 @@
 import re
 import os
+from app.memory import get_store
+from app.memory.models import MemoryType
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers
 from app.models.analysis import AIAnalysis
 from app.services.llm import chat_completion
@@ -36,12 +38,19 @@ def analyze_with_ai(ticker: str) -> AIAnalysis:
     filled = _render_template(prompt, **ctx)
 
     system_prompt = _load_prompt("system.md")
+    store = get_store()
+    memory_block = store.serialize_for_prompt()
+    if memory_block:
+        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
+    else:
+        system_prompt = system_prompt.replace("{{MEMORY}}", "")
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
     ], temperature=0)
 
     if llm_result:
+        store.add(MemoryType.RESEARCH_FINDING, f"{t}: {llm_result.split(chr(10))[0][:120]}", source=t)
         return AIAnalysis(
             ticker=t,
             summary=llm_result,
@@ -82,12 +91,20 @@ def compare_with_ai(tickers: list[str]) -> dict:
     filled = prompt_template.replace("{{stocks}}", stocks_text)
 
     system_prompt = _load_prompt("system.md")
+    store = get_store()
+    memory_block = store.serialize_for_prompt()
+    if memory_block:
+        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
+    else:
+        system_prompt = system_prompt.replace("{{MEMORY}}", "")
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
     ], temperature=0)
 
     analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
+    if llm_result:
+        store.add(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
     if failed:
         analysis += f"\n\n⚠ Tidak dapat memuat data: {', '.join(failed)}"
 
@@ -101,6 +118,12 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
 def ask_llm(user_query: str, context: str = "", messages: list[dict] | None = None) -> str | None:
     system_prompt = _load_prompt("system.md")
+    store = get_store()
+    memory_block = store.serialize_for_prompt()
+    if memory_block:
+        system_prompt = system_prompt.replace("{{MEMORY}}", memory_block)
+    else:
+        system_prompt = system_prompt.replace("{{MEMORY}}", "")
     if messages is not None:
         if not any(m.get("role") == "system" for m in messages):
             messages = [{"role": "system", "content": system_prompt}] + messages
