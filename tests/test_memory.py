@@ -58,9 +58,86 @@ def test_serialize_for_prompt():
     store.clear()
     store.add(MemoryType.RESEARCH_FINDING, "BBCA: bagus", source="BBCA")
     text = store.serialize_for_prompt()
-    assert "[MEMORI DARI SESI SEBELUMNYA]" in text
+    assert "[KONTEKS TERBARU]" in text
     assert "BBCA: bagus" in text
-    assert "[/MEMORI]" in text
+    assert "[/KONTEKS TERBARU]" in text
+
+
+def test_serialize_with_preferences():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.USER_PREFERENCE, "Bahasa Indonesia", source="user")
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik", source="BBCA")
+    text = store.serialize_for_prompt(ticker="BBCA")
+    assert "[PREFERENSI USER]" in text
+    assert "[RISET SEBELUMNYA]" in text
+    assert "BBCA: laba naik" in text
+    assert "Bahasa Indonesia" in text
+
+
+def test_get_relevant():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "BBRI: valuasi murah", source="BBRI")
+    r = store.get_relevant("BBCA")
+    assert len(r) == 1
+    assert "BBCA" in r[0].content
+
+
+def test_get_relevant_no_match():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik", source="BBCA")
+    r = store.get_relevant("TIDAKADA")
+    assert r == []
+
+
+def test_get_relevant_multi_word_tight():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "saham bank bagus", source="BANK")
+    r = store.get_relevant("saham bank")
+    assert len(r) == 1
+    assert r[0].source == "BANK"
+
+
+def test_get_relevant_multi_word_mixed_fields():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "saham bank bagus", source="BANK")
+    r = store.get_relevant("BBCA laba")
+    assert len(r) == 1
+    assert r[0].source == "BBCA"
+
+
+def test_get_relevant_multi_word_duplicate_content():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba turun 5%", source="BBCA")
+    r = store.get_relevant("BBCA laba")
+    assert len(r) == 2
+
+
+def test_get_relevant_multi_word_unknown_ticker():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik 15%", source="BBCA")
+    r = store.get_relevant("XYZB laba")
+    assert r == []
+
+
+def test_add_or_update_updates_existing():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    e1 = store.add_or_update(MemoryType.RESEARCH_FINDING, "BBCA: lama", source="BBCA")
+    e2 = store.add_or_update(MemoryType.RESEARCH_FINDING, "BBCA: baru", source="BBCA")
+    assert e1.id == e2.id
+    assert e2.content == "BBCA: baru"
+    assert store.count() == 1
 
 
 def test_persistence():
