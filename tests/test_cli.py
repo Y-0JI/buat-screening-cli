@@ -209,10 +209,11 @@ def test_chat_saves_last_exchanges_to_memory():
     assert result.exit_code == 0
     assert mock_llm.call_count == 5, "penyimpanan memori tidak boleh memicu panggilan AI tambahan"
     entries = [e for e in store.get_all() if e.type == MemoryType.IMPORTANT_CONTEXT and e.source == "chat"]
-    assert entries, "sesi chat berisi percakapan harus menyimpan jejak"
+    assert len(entries) == 1, "satu sesi chat harus menghasilkan tepat satu entri memori"
     content = entries[0].content
-    assert "pertanyaan 4" in content and "pertanyaan 5" in content, "ekor percakapan harus tersimpan"
+    assert "pertanyaan 3" in content and "pertanyaan 4" in content and "pertanyaan 5" in content, "3 pertanyaan-jawaban terakhir harus tersimpan"
     assert "jawaban AI" in content
+    assert "pertanyaan 2" not in content, "batas ekor: Q&A ke-4 dari akhir harus terpotong"
     assert "pertanyaan 1" not in content, "hanya ekor percakapan yang boleh tersimpan, bukan seluruh riwayat"
 
 
