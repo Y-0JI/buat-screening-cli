@@ -146,3 +146,13 @@ class MemoryStore:
             blocks.append("\n".join(lines))
 
         return "\n\n".join(blocks)
+
+    def grouped_by_subject(self) -> dict[str, list[MemoryEntry]]:
+        prefs = []
+        groups: dict[str, list[MemoryEntry]] = {}
+        for e in self.get_all():
+            if e.type == MemoryType.USER_PREFERENCE:
+                prefs.append(e)
+            else:
+                groups.setdefault(e.source or "Lainnya", []).append(e)
+        return {"preferences": prefs, "groups": groups}

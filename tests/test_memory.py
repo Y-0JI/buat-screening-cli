@@ -140,6 +140,22 @@ def test_add_or_update_updates_existing():
     assert store.count() == 1
 
 
+def test_grouped_by_subject():
+    store = MemoryStore(path="/tmp/test_memory.json")
+    store.clear()
+    store.add(MemoryType.USER_PREFERENCE, "Bahasa Indonesia", source="user")
+    store.add(MemoryType.RESEARCH_FINDING, "BBCA: laba naik", source="BBCA")
+    store.add(MemoryType.IMPORTANT_CONTEXT, "BBCA: aksi korporasi", source="BBCA")
+    store.add(MemoryType.RESEARCH_FINDING, "BBRI: valuasi murah", source="BBRI")
+    store.add(MemoryType.RESEARCH_FINDING, "tanpa subjek")
+    g = store.grouped_by_subject()
+    assert len(g["preferences"]) == 1
+    assert g["preferences"][0].content == "Bahasa Indonesia"
+    assert len(g["groups"]["BBCA"]) == 2
+    assert len(g["groups"]["BBRI"]) == 1
+    assert len(g["groups"]["Lainnya"]) == 1
+
+
 def test_persistence():
     path = "/tmp/test_memory_persist.json"
     store = MemoryStore(path=path)
