@@ -29,6 +29,9 @@ def run_research(query: str) -> ResearchReport:
     data_quality = {}
     failed = []
 
+    if intent.type == "unsupported":
+        return ResearchReport(intent, None, None, None, {}, [], "Query ini bukan permintaan riset.", [])
+
     if intent.type == "sector_theme":
         all_tickers = [s["ticker"] for s in get_all()]
         results, _invalid, _failed = bulk_screen(all_tickers)
@@ -70,7 +73,7 @@ def run_research(query: str) -> ResearchReport:
         if len(analyses) < len(tickers):
             failed = [t for t in tickers if t not in analyses]
         if analyses:
-            comparison = compare_with_ai(list(analyses.keys()))
+            comparison = compare_with_ai(tickers)
 
     elif intent.type == "analyze_only":
         t = intent.tickers[0] if intent.tickers else ""
@@ -80,6 +83,9 @@ def run_research(query: str) -> ResearchReport:
                 ctx = build_context(data)
                 data_quality[t] = ctx.get("data_caveats", [])
                 analyses = {t: analyze_with_ai(t)}
+
+    if failed and not analyses and not screening_results:
+        return ResearchReport(intent, None, None, None, data_quality, [], "Laporan riset otomatis berdasarkan data terkini.", failed)
 
     prompt = _load_prompt("research.md")
     filled = _render_report_prompt(prompt, intent, screening_results, analyses, comparison, data_quality)

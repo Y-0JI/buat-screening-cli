@@ -131,6 +131,39 @@ def test_compare_caveats_in_prompt():
             assert "Keterbatasan Data:" in user_msg
 
 
+def test_research_no_ai_when_all_data_failed():
+    with patch("app.agent.research.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = None
+        with patch("app.agent.research.chat_completion") as mock_llm:
+            report = run_research("analisa XYZY")
+            assert report.failed == ["XYZY"]
+            assert report.analyses is None
+            mock_llm.assert_not_called()
+
+
+def test_research_unsupported_query_no_ai():
+    with patch("app.agent.research.chat_completion") as mock_llm:
+        report = run_research("gainers")
+        assert report.intent.type == "unsupported"
+        mock_llm.assert_not_called()
+
+
+def test_research_compare_partial_sends_all_tickers():
+    with patch("app.agent.research.fetch_stock") as mock_fetch:
+        mock_fetch.side_effect = lambda t: _mock_stock_data() if t == "BBCA" else None
+        with patch("app.agent.core.fetch_stock") as mock_core_fetch:
+            mock_core_fetch.side_effect = lambda t: _mock_stock_data() if t == "BBCA" else None
+            with patch("app.agent.core.chat_completion") as mock_llm_core:
+                mock_llm_core.return_value = "BBCA stabil."
+                with patch("app.agent.research.chat_completion") as mock_llm:
+                    mock_llm.return_value = "Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold"
+                    with patch("app.agent.research.compare_with_ai") as mock_compare:
+                        mock_compare.return_value = {"type": "comparison", "analysis": "x"}
+                        report = run_research("bandingkan BBCA dan BBRI")
+                        assert report.failed == ["BBRI"]
+                        mock_compare.assert_called_once_with(["BBCA", "BBRI"])
+
+
 def _mock_stock_data(days: int = 30):
     from datetime import date, timedelta
     from app.models.stock import HistoricalPrice, StockData, StockInfo

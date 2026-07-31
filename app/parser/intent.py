@@ -17,37 +17,30 @@ INTENT_UNKNOWN = "unknown"
 
 @dataclass
 class ResearchIntent:
-    type: Literal["single_stock", "sector_theme", "comparative", "screening_only", "analyze_only"]
+    type: Literal["single_stock", "sector_theme", "comparative", "screening_only", "analyze_only", "unsupported"]
     tickers: list[str]
     sector: str | None
     raw_query: str
 
 
+def _extract_sector(text: str) -> str | None:
+    m = re.search(r"(?:sektor|sector)\s+(\w+)", text.lower())
+    return m.group(1) if m else None
+
+
 def detect_research_intent(query: str) -> ResearchIntent:
-    q = query.lower().strip()
-    words = q.split()
-
-    ticker_match = re.search(r'\b([A-Z]{3,5})\b', query.upper())
-    if ticker_match and len(words) <= 3:
-        return ResearchIntent("single_stock", [ticker_match.group(1)], None, query)
-    if any(w in q for w in ["analisa", "analisis", "analyze"]):
-        for w in words:
-            if w.isalpha() and 3 <= len(w) <= 5:
-                return ResearchIntent("single_stock", [normalize(w)], None, query)
-
-    if any(w in q for w in ["bandingkan", "bandingin", "compare", "vs", "versus"]):
-        tickers = [normalize(w) for w in words if w.isalpha() and 3 <= len(w) <= 5]
-        if len(tickers) >= 2:
-            return ResearchIntent("comparative", tickers[:2], None, query)
-
-    sector_keywords = ["sektor", "sector", "screening", "cari", "temukan", "saham", "bagus"]
-    if any(w in q for w in sector_keywords):
-        for i, w in enumerate(words):
-            if w in ["sektor", "sector"] and i + 1 < len(words):
-                return ResearchIntent("sector_theme", [], words[i + 1].title(), query)
-        return ResearchIntent("sector_theme", [], None, query)
-
-    return ResearchIntent("sector_theme", [], None, query)
+    intent, params = parse(query)
+    if intent == INTENT_ANALYZE:
+        ticker = params.get("ticker", "")
+        return ResearchIntent("single_stock", [ticker] if ticker else [], None, query)
+    if intent == INTENT_COMPARE:
+        tickers = [normalize(t) for t in params.get("tickers", "").replace(",", " ").split() if t]
+        return ResearchIntent("comparative", tickers, None, query)
+    if intent == INTENT_SCREEN:
+        return ResearchIntent("sector_theme", [], params.get("sector") or _extract_sector(query), query)
+    if intent == INTENT_RESEARCH:
+        return ResearchIntent("sector_theme", [], _extract_sector(query), query)
+    return ResearchIntent("unsupported", [], None, query)
 
 
 def parse(text: str) -> tuple[str, dict]:
@@ -60,12 +53,15 @@ def parse(text: str) -> tuple[str, dict]:
         return INTENT_LOSERS, {}
 
     compare_match = re.search(
-        r"(?:bandingkan|compare|perbandingan|vs\.?|versus)\s+(\w{2,5})\s*(?:dan|,|&|vs\.?|dengan|sama)?\s*(\w{0,5})",
+        r"(\w{2,5})\s+(?:vs\.?|versus)\s+(\w{2,5})"
+        r"|(?:bandingkan|compare|perbandingan|vs\.?|versus)\s+(\w{2,5})\s*(?:dan|,|&|vs\.?|dengan|sama)?\s*(\w{0,5})",
         text_lower,
     )
     if compare_match:
-        t1 = normalize(compare_match.group(1))
-        t2 = normalize(compare_match.group(2)) if compare_match.group(2) else ""
+        if compare_match.group(1):
+            t1, t2 = normalize(compare_match.group(1)), normalize(compare_match.group(2))
+        else:
+            t1, t2 = normalize(compare_match.group(3)), normalize(compare_match.group(4))
         if len(t2) < 2:
             tickers = t1
         else:
@@ -81,9 +77,9 @@ def parse(text: str) -> tuple[str, dict]:
     if re.search(r"breakout|golden\s*cross|screening|saham\s+apa|rekomendasi|cari\s+saham", text_lower):
         return INTENT_SCREEN, {"type": "all"}
 
-    sector_match = re.search(r"(?:sektor|sector)\s+(\w+)", text_lower)
+    sector_match = _extract_sector(text_lower)
     if sector_match:
-        return INTENT_SCREEN, {"type": "sector", "sector": sector_match.group(1)}
+        return INTENT_SCREEN, {"type": "sector", "sector": sector_match}
 
     if re.search(r"\b(?:stocks?|daftar|list|emiten|saham\s+aja)\b", text_lower):
         return INTENT_STOCKS, {}

@@ -241,6 +241,9 @@ def natural(query: str) -> None:
 def research(query: str) -> None:
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
         report = run_research(query)
+    if report.intent.type == "unsupported":
+        _p.info("Query ini bukan permintaan riset. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'cari saham breakout'")
+        return
     if report.failed and not report.analyses and not report.screening_results:
         _p.error(f"Data tidak ditemukan: {', '.join(report.failed)}")
         raise typer.Exit(1)

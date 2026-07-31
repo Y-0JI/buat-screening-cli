@@ -1,4 +1,4 @@
-from app.parser.intent import parse, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN, INTENT_GAINERS, INTENT_LOSERS, INTENT_STOCKS
+from app.parser.intent import parse, detect_research_intent, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN, INTENT_GAINERS, INTENT_LOSERS, INTENT_STOCKS
 
 
 class TestParse:
@@ -16,6 +16,16 @@ class TestParse:
         intent, params = parse("Bandingkan BBCA dan BBRI")
         assert intent == INTENT_COMPARE
         assert "BBCA" in params["tickers"]
+
+    def test_compare_vs_between_tickers(self):
+        intent, params = parse("BBCA vs BBRI")
+        assert intent == INTENT_COMPARE
+        assert params["tickers"] == "BBCA,BBRI"
+
+    def test_compare_verb_with_vs(self):
+        intent, params = parse("bandingkan BBCA vs BBRI")
+        assert intent == INTENT_COMPARE
+        assert params["tickers"] == "BBCA,BBRI"
 
     def test_screen_breakout(self):
         intent, params = parse("Cari saham yang sedang breakout")
@@ -40,3 +50,25 @@ class TestParse:
     def test_unknown(self):
         intent, params = parse("lalala")
         assert intent == INTENT_UNKNOWN
+
+
+class TestDetectResearchIntent:
+    def test_consistency_with_parse(self):
+        cases = [
+            ("analisa BBCA", "single_stock", ["BBCA"], None),
+            ("bandingkan BBCA dan BBRI", "comparative", ["BBCA", "BBRI"], None),
+            ("BBCA vs BBRI", "comparative", ["BBCA", "BBRI"], None),
+            ("cari saham breakout", "sector_theme", [], None),
+            ("sektor bank", "sector_theme", [], "bank"),
+            ("riset sektor financials", "sector_theme", [], "financials"),
+            ("gainers", "unsupported", [], None),
+            ("losers", "unsupported", [], None),
+            ("stocks", "unsupported", [], None),
+            ("help", "unsupported", [], None),
+            ("lalala", "unsupported", [], None),
+        ]
+        for q, itype, tickers, sector in cases:
+            r = detect_research_intent(q)
+            assert r.type == itype, q
+            assert r.tickers == tickers, q
+            assert r.sector == sector, q
