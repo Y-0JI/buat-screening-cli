@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     provider_fallback_order: str = "yahoo,idx"
     provider_cache_ttl_hours: int = 24
     log_level: str = "INFO"
-    watchlist_storage: str = "local"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
