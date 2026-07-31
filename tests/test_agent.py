@@ -1,5 +1,7 @@
 from unittest.mock import patch
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
+from app.agent.research import run_research
+from app.models.analysis import AIAnalysis
 
 
 def test_analyze_with_ai_no_data():
@@ -55,6 +57,46 @@ def test_ask_llm_with_context(mock_llm):
     result = ask_llm("Apa sinyal?", context="BBCA: Golden Cross")
     assert result is not None
     mock_llm.assert_called_once()
+
+
+def _assert_no_memory_placeholder(messages):
+    assert not any("{{MEMORY}}" in m.get("content", "") for m in messages)
+
+
+def test_analyze_memory_injected():
+    with patch("app.agent.core.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data()
+        with patch("app.agent.core.chat_completion") as mock_llm:
+            mock_llm.return_value = "BBCA ok."
+            analyze_with_ai("BBCA")
+            _assert_no_memory_placeholder(mock_llm.call_args.args[0])
+
+
+def test_compare_memory_injected():
+    with patch("app.agent.core.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data()
+        with patch("app.agent.core.chat_completion") as mock_llm:
+            mock_llm.return_value = "BBCA vs BBRI."
+            compare_with_ai(["BBCA", "BBRI"])
+            _assert_no_memory_placeholder(mock_llm.call_args.args[0])
+
+
+@patch("app.agent.core.chat_completion")
+def test_ask_llm_memory_injected(mock_llm):
+    mock_llm.return_value = "jawaban"
+    ask_llm("test")
+    _assert_no_memory_placeholder(mock_llm.call_args.args[0])
+
+
+def test_research_memory_injected():
+    with patch("app.agent.research.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data()
+        with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+            mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
+            with patch("app.agent.research.chat_completion") as mock_llm:
+                mock_llm.return_value = "Ringkasan Eksekutif: tes\nRekomendasi:\n1. hold"
+                run_research("analisa BBCA")
+                _assert_no_memory_placeholder(mock_llm.call_args.args[0])
 
 
 def _mock_stock_data():

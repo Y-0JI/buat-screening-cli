@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
-from app.agent.core import analyze_with_ai, compare_with_ai, _load_prompt
+from app.agent.core import analyze_with_ai, compare_with_ai, _load_prompt, _build_system_prompt
 from app.router.engine import fetch_stock, bulk_screen, build_context
 from app.services.llm import chat_completion
 from app.services.stock_list import get_all
@@ -80,7 +80,7 @@ def run_research(query: str) -> ResearchReport:
 
     prompt = _load_prompt("research.md")
     filled = _render_report_prompt(prompt, intent, screening_results, analyses, comparison, data_quality)
-    system_prompt = _load_prompt("system.md")
+    system_prompt = _build_system_prompt()
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": filled},
