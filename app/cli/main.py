@@ -615,22 +615,28 @@ app.add_typer(memory_cmd, name="memory", help="Kelola memori AI")
 
 @memory_cmd.command(name="show")
 def memory_show(limit: int = typer.Option(20, "--limit", "-n", help="Jumlah maksimal")) -> None:
-    """Tampilkan memori AI."""
+    """Tampilkan memori AI, dikelompokkan per subjek."""
     store = get_store()
-    entries = store.get_recent(limit)
-    if not entries:
+    grouped = store.grouped_by_subject()
+    prefs = grouped["preferences"]
+    groups = grouped["groups"]
+    if not prefs and not groups:
         console.print("[yellow]Belum ada memori.[/yellow]")
         return
-    from rich.table import Table
-    table = Table(title="Memori AI")
-    table.add_column("No", style="dim")
-    table.add_column("Tipe")
-    table.add_column("Konten")
-    table.add_column("Sumber")
-    table.add_column("Waktu")
-    for i, e in enumerate(entries, 1):
-        table.add_row(str(i), e.type.value, e.content[:60], e.source or "-", e.created_at.strftime("%d/%m %H:%M"))
-    console.print(table)
+    if prefs:
+        console.print("[bold]Preferensi User[/bold]")
+        for e in prefs[:limit]:
+            console.print(f"  - {e.content}")
+    shown = 0
+    for subject, entries in groups.items():
+        if shown >= limit:
+            break
+        console.print(f"\n[bold]{subject}[/bold]")
+        for e in entries:
+            if shown >= limit:
+                break
+            shown += 1
+            console.print(f"  - {e.content}")
 
 
 @memory_cmd.command()
