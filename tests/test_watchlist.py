@@ -12,7 +12,6 @@ from app.services.watchlist import (
 from app.models.watchlist import Watchlist
 from app.storage import set_test_backend
 from app.storage.local import LocalJsonStorage
-from app.storage.sqlite import SqliteStorage
 
 _JSON_DATA_PATH: str | None = None
 

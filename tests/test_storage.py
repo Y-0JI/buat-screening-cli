@@ -3,7 +3,6 @@ import tempfile
 
 from app.storage.base import StorageBackend
 from app.storage.local import LocalJsonStorage
-from app.storage.sqlite import SqliteStorage
 
 
 def _sample_data() -> list[dict]:
@@ -75,35 +74,3 @@ def test_local_json():
         _test_backend(backend)
     finally:
         os.unlink(path)
-
-
-def test_sqlite():
-    fd, path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
-    try:
-        backend = SqliteStorage(path=path)
-        _test_backend(backend)
-    finally:
-        os.unlink(path)
-
-
-def test_both_backends_produce_same_result():
-    fd1, path1 = tempfile.mkstemp(suffix=".json")
-    os.close(fd1)
-    fd2, path2 = tempfile.mkstemp(suffix=".db")
-    os.close(fd2)
-    try:
-        wl = _sample_data()
-        json_backend = LocalJsonStorage(path=path1)
-        sql_backend = SqliteStorage(path=path2)
-        for backend in (json_backend, sql_backend):
-            backend.save(wl)
-            loaded = backend.load()
-            assert len(loaded) == 2
-            assert loaded[0]["entries"][0]["ticker"] == "BBCA"
-            assert loaded[1]["entries"] == []
-        json_backend.save([])
-        sql_backend.save([])
-    finally:
-        os.unlink(path1)
-        os.unlink(path2)
