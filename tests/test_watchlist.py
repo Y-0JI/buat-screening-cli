@@ -682,3 +682,15 @@ def test_resolve_id_not_found():
     except ValueError:
         pass
     _cleanup()
+
+
+def test_resolve_id_empty_storage_no_side_effect():
+    _clean()
+    from app.services.watchlist import _load
+    try:
+        resolve_id("nonexistent")
+        assert False, "should raise"
+    except ValueError:
+        pass
+    assert _load() == [], "resolve_id harus read-only, tidak boleh bikin default watchlist"
+    _cleanup()

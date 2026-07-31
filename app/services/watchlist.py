@@ -415,11 +415,7 @@ def refresh_all(live: bool = True) -> list[dict]:
 
 def resolve_id(id_or_name: str) -> str:
     data = _load()
-    data = _ensure_default(data)
-    for d in data:
-        if d["id"] == id_or_name:
-            return id_or_name
-    for d in data:
-        if d["name"] == id_or_name:
-            return d["id"]
-    raise ValueError(f"Watchlist '{id_or_name}' tidak ditemukan")
+    resolved = next((d["id"] for d in data if id_or_name in (d["id"], d["name"])), None)
+    if resolved is None:
+        raise ValueError(f"Watchlist '{id_or_name}' tidak ditemukan")
+    return resolved
