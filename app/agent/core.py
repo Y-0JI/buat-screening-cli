@@ -90,7 +90,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     prompt_template = _load_prompt("comparison.md")
     stocks_text = "\n".join(
-        f"- {r['ticker']}: Harga {r['price']}, Perubahan {r['change']}, Indikator {r['indicators']}, Screening {r['screening']}"
+        f"- {r['ticker']}: Harga {r['price']}, Perubahan {r['change']}, Indikator {r['indicators']}, Screening {r['screening']}\n  Keterbatasan Data: {_render_caveats(r['data_caveats'])}"
         for r in results
     )
     filled = prompt_template.replace("{{stocks}}", stocks_text)

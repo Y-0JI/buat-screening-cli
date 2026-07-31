@@ -121,6 +121,16 @@ def test_analyze_caveats_default_when_none():
             assert "Tidak ada keterbatasan" in user_msg
 
 
+def test_compare_caveats_in_prompt():
+    with patch("app.agent.core.fetch_stock") as mock_fetch:
+        mock_fetch.return_value = _mock_stock_data(days=30)
+        with patch("app.agent.core.chat_completion") as mock_llm:
+            mock_llm.return_value = "BBCA vs BBRI."
+            compare_with_ai(["BBCA", "BBRI"])
+            user_msg = mock_llm.call_args.args[0][1]["content"]
+            assert "Keterbatasan Data:" in user_msg
+
+
 def _mock_stock_data(days: int = 30):
     from datetime import date, timedelta
     from app.models.stock import HistoricalPrice, StockData, StockInfo
