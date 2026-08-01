@@ -8,6 +8,7 @@ from app.parser.intent import detect_research_intent, ResearchIntent
 from app.memory import get_store
 from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
+from app.models.research import REPORT_SECTIONS, ResearchData, ResearchSection, SectionStatus
 
 
 @dataclass
@@ -20,6 +21,70 @@ class ResearchReport:
     recommendations: list[str]
     executive_summary: str
     failed: list[str] = field(default_factory=list)
+    research_data: ResearchData | None = None
+
+
+def _mark_available(sections: dict[str, ResearchSection], key: str, source: str = "yahoo") -> dict:
+    if sections[key].status == SectionStatus.MISSING:
+        sections[key] = ResearchSection(source=source, status=SectionStatus.AVAILABLE)
+    return sections[key].data
+
+
+def build_research_data(intent: ResearchIntent, screening_results, analyses, data_quality) -> ResearchData:
+    """Normalize research outputs into the provider-independent ResearchData contract."""
+    sections = {key: ResearchSection() for key in REPORT_SECTIONS}
+    dq = data_quality or {}
+
+    if screening_results:
+        sections["market"] = ResearchSection(
+            source="screening", status=SectionStatus.AVAILABLE, data={"results": screening_results[:15]}
+        )
+
+    for ticker, a in (analyses or {}).items():
+        info = a.raw_data.info if a.raw_data else None
+        if info:
+            company = _mark_available(sections, "company")
+            company[ticker] = {
+                "name": info.name,
+                "sector": info.sector,
+                "industry": info.industry,
+                "exchange": info.exchange,
+                "market_cap": info.market_cap,
+                "currency": info.currency,
+            }
+            fund = info.fundamentals
+            if fund:
+                fundamental = _mark_available(sections, "fundamental")
+                fundamental[ticker] = {
+                    k: fund[k] for k in ("trailingPE", "forwardPE", "returnOnEquity", "profitMargins", "operatingMargins", "bookValue", "beta") if k in fund
+                }
+                valuation = _mark_available(sections, "valuation")
+                valuation[ticker] = {
+                    k: fund[k] for k in ("priceToBook", "pegRatio", "enterpriseToRevenue", "targetMeanPrice", "targetHighPrice", "targetLowPrice") if k in fund
+                }
+                growth = _mark_available(sections, "growth")
+                growth[ticker] = {
+                    k: fund[k] for k in ("revenueGrowth", "earningsGrowth", "earningsQuarterlyGrowth") if k in fund
+                }
+                dividend = _mark_available(sections, "dividend")
+                dividend[ticker] = {
+                    k: fund[k] for k in ("dividendYield", "dividendRate", "payoutRatio", "trailingAnnualDividendYield") if k in fund
+                }
+        if a.raw_data and a.raw_data.history:
+            hist = a.raw_data.history
+            prev = hist[-2].close if len(hist) > 1 else hist[-1].close
+            change = ((hist[-1].close - prev) / prev * 100) if prev else 0.0
+            price = _mark_available(sections, "price")
+            price[ticker] = {"price": hist[-1].close, "change_pct": round(change, 2), "volume": hist[-1].volume}
+            technical = _mark_available(sections, "technical")
+            technical[ticker] = {"key_metrics": a.key_metrics}
+            if a.screening_results:
+                technical[ticker]["signals"] = [s.signal for s in a.screening_results]
+            if dq.get(ticker):
+                risk = _mark_available(sections, "risk")
+                risk[ticker] = {"caveats": dq[ticker]}
+
+    return ResearchData(symbol=",".join(intent.tickers) if intent.tickers else "", sections=sections)
 
 
 def run_research(query: str) -> ResearchReport:
@@ -30,6 +95,7 @@ def run_research(query: str) -> ResearchReport:
     comparison = None
     data_quality = {}
     failed = []
+    research_data = None
 
     if intent.type == "unsupported":
         return ResearchReport(intent, None, None, None, {}, [], "Query ini bukan permintaan riset.", [])
@@ -89,6 +155,8 @@ def run_research(query: str) -> ResearchReport:
     if failed and not analyses and not screening_results:
         return ResearchReport(intent, None, None, None, data_quality, [], "Laporan riset otomatis berdasarkan data terkini.", failed)
 
+    research_data = build_research_data(intent, screening_results, analyses, data_quality)
+
     prompt = _load_prompt("research.md")
     filled = _render_report_prompt(prompt, intent, screening_results, analyses, comparison, data_quality)
     system_prompt = _build_system_prompt()
@@ -127,6 +195,7 @@ def run_research(query: str) -> ResearchReport:
         recommendations=recommendations,
         executive_summary=executive_summary.strip(),
         failed=failed,
+        research_data=research_data,
     )
 
 
