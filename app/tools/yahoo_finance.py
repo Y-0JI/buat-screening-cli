@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -40,22 +41,6 @@ def _extract_fundamentals(info: dict) -> dict[str, float | str]:
             continue  # yfinance fills some fields with 0.0 placeholder, not real data
         out[key] = val
     return out
-
-
-def _json_safe(data):
-    """Recursively convert pandas/numpy values & Timestamp keys to JSON-safe types."""
-    if isinstance(data, dict):
-        return {str(k): _json_safe(v) for k, v in data.items()}
-    if isinstance(data, (list, tuple)):
-        return [_json_safe(v) for v in data]
-    if isinstance(data, bool) or data is None:
-        return data
-    if isinstance(data, int):
-        return int(data)
-    try:
-        return float(data)
-    except (TypeError, ValueError):
-        return str(data)
 
 
 class YahooFinanceProvider(Provider):
@@ -135,7 +120,7 @@ class YahooFinanceProvider(Provider):
                 out = {}
                 for name, attr in (("financials", stock.financials), ("balance_sheet", stock.balance_sheet), ("cashflow", stock.cashflow), ("dividends", stock.dividends)):
                     if attr is not None and not attr.empty:
-                        out[name] = _json_safe(attr.to_dict())
+                        out[name] = json.loads(attr.to_json(date_format="iso"))  # JSON-safe natively, dates stay readable
                 return out
             except Exception as e:
                 kind = _classify_error(e)

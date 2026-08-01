@@ -15,6 +15,10 @@ class ProviderCache:
         self.ttl_seconds = ttl_hours * 3600
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+    def _is_expired(self, path: Path, ttl_hours: float | None = None) -> bool:
+        ttl = (ttl_hours if ttl_hours is not None else self.ttl_seconds / 3600) * 3600
+        return time.time() - os.path.getmtime(path) > ttl
+
     def save_json(self, key: str, data: dict) -> None:
         path = self.cache_dir / f"{key}.json"
         try:
@@ -28,8 +32,7 @@ class ProviderCache:
         if not path.exists():
             logger.debug(f"JSON cache MISS: {key}")
             return None
-        ttl = (ttl_hours if ttl_hours is not None else self.ttl_seconds / 3600) * 3600
-        if time.time() - os.path.getmtime(path) > ttl:
+        if self._is_expired(path, ttl_hours):
             logger.debug(f"JSON cache EXPIRED: {key}")
             return None
         try:
@@ -58,9 +61,8 @@ class ProviderCache:
             logger.debug(f"Cache MISS: {ticker}")
             return None
         if not allow_stale:
-            age = time.time() - os.path.getmtime(path)
-            if age > self.ttl_seconds:
-                logger.debug(f"Cache EXPIRED: {ticker}, age={age/3600:.1f}h")
+            if self._is_expired(path):
+                logger.debug(f"Cache EXPIRED: {ticker}")
                 return None
         try:
             data = StockData.model_validate_json(path.read_text())

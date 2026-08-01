@@ -96,16 +96,16 @@ def test_fetch_financials_retries_on_rate_limit():
             calls["n"] += 1
             if calls["n"] == 1:
                 raise Exception("Too many requests")
-            return Mock(empty=False, to_dict=lambda: {"Total Revenue": 1})
+            return Mock(empty=False, to_json=lambda **kw: '{"2025-12-31": {"Total Revenue": 1}}')
         @property
         def balance_sheet(self):
-            return Mock(empty=False, to_dict=lambda: {})
+            return Mock(empty=False, to_json=lambda **kw: "{}")
         @property
         def cashflow(self):
-            return Mock(empty=False, to_dict=lambda: {})
+            return Mock(empty=False, to_json=lambda **kw: "{}")
         @property
         def dividends(self):
-            return Mock(empty=False, to_dict=lambda: {})
+            return Mock(empty=False, to_json=lambda **kw: "{}")
 
     with patch("app.tools.yahoo_finance.yf.Ticker", return_value=Flaky()):
         with patch("app.tools.yahoo_finance.time.sleep", return_value=None):
