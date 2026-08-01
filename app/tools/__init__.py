@@ -80,6 +80,19 @@ class FallbackProvider:
                 logger.warning(f"list_symbols gagal untuk {type(provider).__name__}, dilewati")
         return results
 
+    def fetch_financials(self, ticker: str) -> dict:
+        for provider in self.providers:
+            fn = getattr(provider, "fetch_financials", None)
+            if not fn:
+                continue
+            try:
+                out = fn(ticker)
+                if out:
+                    return out
+            except Exception:
+                continue
+        return {}
+
 
 def get_provider(name: str | None = None):
     if name:

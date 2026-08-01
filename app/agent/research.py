@@ -9,6 +9,17 @@ from app.memory import get_store
 from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
 from app.models.research import REPORT_SECTION_LABELS, REPORT_SECTIONS, ResearchData, ResearchSection, SectionStatus
+from app.agent.enrichment import compute_price_position, compute_volatility, enrich_financials
+from app.tools import get_provider
+
+_financials_cache: dict[str, dict] = {}
+
+
+def _get_financials(ticker: str) -> dict:
+    """Lazy financial statements, cached for the whole process (session)."""
+    if ticker not in _financials_cache:
+        _financials_cache[ticker] = get_provider().fetch_financials(ticker)
+    return _financials_cache[ticker]
 
 
 @dataclass
@@ -29,6 +40,33 @@ def _mark_available(sections: dict[str, ResearchSection], key: str, source: str 
     if sections[key].status == SectionStatus.MISSING:
         sections[key] = ResearchSection(source=source, status=SectionStatus.AVAILABLE)
     return sections[key].data
+
+
+def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
+    """Platform enrichment phase: derived metrics into the contract. Deterministic."""
+    for ticker, a in (analyses or {}).items():
+        if not (a.raw_data and a.raw_data.history):
+            continue
+        hist = a.raw_data.history
+        info = a.raw_data.info
+        price = hist[-1].close
+
+        price_data = _mark_available(rd.sections, "price", source="yahoo info")
+        price_data.setdefault(ticker, {})
+        fund = info.fundamentals or {}
+        price_data[ticker].update(compute_price_position(price, fund.get("fiftyTwoWeekHigh"), fund.get("fiftyTwoWeekLow")))
+
+        vol = compute_volatility([p.close for p in hist])
+        if vol is not None:
+            risk_data = _mark_available(rd.sections, "risk", source="derived")
+            risk_data.setdefault(ticker, {})["volatility_annual_pct"] = vol
+
+        raw = _get_financials(ticker)
+        if raw:
+            metrics = enrich_financials(raw)
+            if metrics:
+                fin_data = _mark_available(rd.sections, "financial", source="yahoo financials")
+                fin_data[ticker] = metrics
 
 
 def build_research_data(intent: ResearchIntent, screening_results, analyses, comparison, data_quality) -> ResearchData:
@@ -163,6 +201,7 @@ def run_research(query: str) -> ResearchReport:
         return ResearchReport(intent, None, None, None, data_quality, [], "Laporan riset otomatis berdasarkan data terkini.", failed)
 
     research_data = build_research_data(intent, screening_results, analyses, comparison, data_quality)
+    enrich_research_data(research_data, analyses)
 
     user_prompt = build_report_prompt(research_data)
     system_prompt = _build_system_prompt()
@@ -258,6 +297,52 @@ def _trim_analysis(text: str, limit: int = 800) -> str:
     return f"{text[:half]}\n[... bagian tengah dipotong ...]\n{text[-half:]}"
 
 
+def _fmt_num(v) -> str:
+    if isinstance(v, (int, float)):
+        if abs(v) >= 1e12:
+            return f"{v / 1e12:.1f}T"
+        if abs(v) >= 1e9:
+            return f"{v / 1e9:.1f}B"
+        if abs(v) >= 1e6:
+            return f"{v / 1e6:.1f}M"
+        return f"{v:.2f}"
+    return str(v)
+
+
+def _fmt_metric(v) -> str:
+    if not isinstance(v, dict):
+        return _fmt_num(v)
+    latest = v.get("latest")
+    if latest is None:
+        return ""
+    s = _fmt_num(latest)
+    yoy = v.get("yoy_pct")
+    if yoy is not None:
+        s += f" ({yoy:+.1f}% YoY)"
+    return s
+
+
+def _serialize_financial(data: dict) -> list[str]:
+    lines = []
+    for ticker, metrics in data.items():
+        parts = []
+        for label, key in (
+            ("Pendapatan", "revenue"),
+            ("Laba bersih", "net_income"),
+            ("Utang", "total_debt"),
+            ("Kas", "cash"),
+            ("Ekuitas", "equity"),
+            ("Arus kas operasi", "operating_cash_flow"),
+            ("FCF", "free_cash_flow"),
+        ):
+            s = _fmt_metric(metrics.get(key))
+            if s:
+                parts.append(f"{label} {s}")
+        if parts:
+            lines.append(f"- {ticker}: " + "; ".join(parts))
+    return lines
+
+
 def _serialize_section_data(data: dict) -> list[str]:
     out = []
     for key, val in data.items():
@@ -288,6 +373,8 @@ def serialize_research_data(rd: ResearchData) -> str:
                 for r in results[:5]
             )
             lines.append(f"- {len(results)} kandidat; top: {top}")
+        elif key == "financial":
+            lines.extend(_serialize_financial(sec.data))
         else:
             lines.extend(_serialize_section_data(sec.data))
     lines.append("## Rekomendasi")
