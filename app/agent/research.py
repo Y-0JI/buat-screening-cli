@@ -111,10 +111,11 @@ def run_research(query: str) -> ResearchReport:
 
     if llm_result:
         recs = "; ".join(recommendations[:3])
+        topic = intent.sector or query.strip()[:50]
         get_store().add_or_update(
             MemoryType.RESEARCH_FINDING,
             f"Riset {intent.type} '{query[:50]}': {executive_summary.strip()[:150]} Rekomendasi: {recs[:150]}",
-            source="research",
+            source=f"research:{intent.type}:{topic}",
         )
 
     return ResearchReport(

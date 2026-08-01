@@ -180,9 +180,46 @@ def test_research_saves_summary_to_memory():
                 with patch("app.agent.research.chat_completion") as mock_llm:
                     mock_llm.return_value = "Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold"
                     run_research("analisa BBCA")
-    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source == "research"]
+    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source.startswith("research:")]
     assert entries, "riset sukses harus menyimpan entri memori"
     assert "Riset single_stock" in entries[0].content
+
+
+def test_compare_two_pairs_both_in_memory():
+    import tempfile
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.core.get_store", return_value=store):
+        with patch("app.agent.core.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = _mock_stock_data()
+            with patch("app.agent.core.chat_completion") as mock_llm:
+                mock_llm.return_value = "hasil A"
+                compare_with_ai(["BBCA", "BBRI"])
+                mock_llm.return_value = "hasil B"
+                compare_with_ai(["TLKM", "ASII"])
+    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source.startswith("compare:")]
+    assert len(entries) == 2, "dua perbandingan beda topik harus dua entri, bukan saling menimpa"
+
+
+def test_research_two_topics_both_in_memory():
+    import tempfile
+    from app.memory import MemoryStore
+    from app.memory.models import MemoryType
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    for q in ("riset sektor financials", "riset sektor energy"):
+        with patch("app.agent.research.get_store", return_value=store):
+            with patch("app.agent.research.get_all", return_value=[{"ticker": "BBCA", "sector": "Financials"}]):
+                with patch("app.agent.research.bulk_screen", return_value=([], [], [])):
+                    with patch("app.agent.research.chat_completion") as mock_llm:
+                        mock_llm.return_value = "Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold"
+                        run_research(q)
+    entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source.startswith("research:")]
+    assert len(entries) == 2, "dua riset beda topik harus dua entri, bukan saling menimpa"
 
 
 def test_research_failed_no_memory_entry():

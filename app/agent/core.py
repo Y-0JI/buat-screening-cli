@@ -103,7 +103,7 @@ def compare_with_ai(tickers: list[str]) -> dict:
 
     analysis = llm_result or "Analisis AI tidak tersedia (periksa konfigurasi AI di .env)"
     if llm_result:
-        get_store().add_or_update(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source="compare")
+        get_store().add_or_update(MemoryType.RESEARCH_FINDING, f"Perbandingan {', '.join(tickers)}: {llm_result.split(chr(10))[0][:120]}", source=f"compare:{','.join(sorted(tickers))}")
     if failed:
         analysis += f"\n\n⚠ Tidak dapat memuat data: {', '.join(failed)}"
 
