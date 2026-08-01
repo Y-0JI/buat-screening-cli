@@ -10,6 +10,8 @@ from app.models.symbol import SymbolInfo
 from app.tools.base import Provider, _classify_error
 from app.tools.registry import ProviderRegistry
 
+# ponytail: shared rate-limit cooldown without a lock; safe at 2 parallel workers
+# (bulk_screen ThreadPoolExecutor max_workers=2). Add a lock if workers increase.
 _last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
 
@@ -38,6 +40,22 @@ def _extract_fundamentals(info: dict) -> dict[str, float | str]:
             continue  # yfinance fills some fields with 0.0 placeholder, not real data
         out[key] = val
     return out
+
+
+def _json_safe(data):
+    """Recursively convert pandas/numpy values & Timestamp keys to JSON-safe types."""
+    if isinstance(data, dict):
+        return {str(k): _json_safe(v) for k, v in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [_json_safe(v) for v in data]
+    if isinstance(data, bool) or data is None:
+        return data
+    if isinstance(data, int):
+        return int(data)
+    try:
+        return float(data)
+    except (TypeError, ValueError):
+        return str(data)
 
 
 class YahooFinanceProvider(Provider):
@@ -106,17 +124,34 @@ class YahooFinanceProvider(Provider):
     def fetch_financials(self, ticker: str) -> dict:
         """Lazy: financial statements, only for full research reports.
 
-        Not called by any fast path (screen/score/analyze).
+        Shares the same rate-limit cooldown and retry logic as fetch().
         """
         stock = yf.Ticker(ticker.upper() + ".JK")
-        out = {}
-        for name, attr in (("financials", stock.financials), ("balance_sheet", stock.balance_sheet), ("cashflow", stock.cashflow), ("dividends", stock.dividends)):
+        cooldown = time.time() - _last_rate_limit[0]
+        if cooldown < 15:
+            time.sleep(15 - cooldown)
+        for attempt in range(3):
             try:
-                if attr is not None and not attr.empty:
-                    out[name] = attr.to_dict()
-            except Exception:
-                pass
-        return out
+                out = {}
+                for name, attr in (("financials", stock.financials), ("balance_sheet", stock.balance_sheet), ("cashflow", stock.cashflow), ("dividends", stock.dividends)):
+                    if attr is not None and not attr.empty:
+                        out[name] = _json_safe(attr.to_dict())
+                return out
+            except Exception as e:
+                kind = _classify_error(e)
+                if kind == "rate_limited":
+                    _last_rate_limit[0] = time.time()
+                    delay = random.uniform(10, 30)
+                    logger.warning(f"Rate limited financials {ticker}, cooling {delay:.0f}s (attempt {attempt+1}/3)")
+                    time.sleep(delay)
+                elif attempt < 2:
+                    delay = (1 + attempt) * random.uniform(0.5, 1.5)
+                    logger.debug(f"Retry financials {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
+                    time.sleep(delay)
+                else:
+                    logger.warning(f"Gagal fetch financials {ticker} setelah 3 percobaan: {e}")
+                    return {}
+        return {}
 
     def get_price(self, ticker: str) -> float | None:
         if ticker.upper() in _invalid_tickers:

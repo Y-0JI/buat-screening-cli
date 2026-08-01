@@ -1,3 +1,4 @@
+import json
 import os
 import time
 from pathlib import Path
@@ -13,6 +14,31 @@ class ProviderCache:
         self.cache_dir = Path(cache_dir)
         self.ttl_seconds = ttl_hours * 3600
         self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_json(self, key: str, data: dict) -> None:
+        path = self.cache_dir / f"{key}.json"
+        try:
+            path.write_text(json.dumps(data))
+            logger.debug(f"JSON cache SAVED: {key}")
+        except Exception as e:
+            logger.warning(f"JSON cache SAVE failed: {key}: {e}")
+
+    def load_json(self, key: str, ttl_hours: float | None = None) -> dict | None:
+        path = self.cache_dir / f"{key}.json"
+        if not path.exists():
+            logger.debug(f"JSON cache MISS: {key}")
+            return None
+        ttl = (ttl_hours if ttl_hours is not None else self.ttl_seconds / 3600) * 3600
+        if time.time() - os.path.getmtime(path) > ttl:
+            logger.debug(f"JSON cache EXPIRED: {key}")
+            return None
+        try:
+            data = json.loads(path.read_text())
+            logger.debug(f"JSON cache HIT: {key}")
+            return data
+        except Exception as e:
+            logger.warning(f"JSON cache LOAD failed: {key}: {e}")
+            return None
 
     def _path(self, ticker: str, period: str, need_profile: bool) -> Path:
         safe = f"{normalize(ticker)}_{period}_{need_profile}"

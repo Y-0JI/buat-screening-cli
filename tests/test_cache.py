@@ -55,3 +55,50 @@ def test_cache_stale():
     c.save("BBCA", "6mo", True, _mock_data())
     loaded = c.load("BBCA", "6mo", True, allow_stale=True)
     assert loaded is not None
+
+
+def test_fresh_cache_skips_provider():
+    from unittest.mock import Mock
+    from app.tools import FallbackProvider
+    d = _empty_cache_dir()
+    fp = FallbackProvider(providers=[], cache=ProviderCache(cache_dir=d, ttl_hours=24))
+    fp.cache.save("BBCA", "6mo", True, _mock_data())
+    provider = Mock()
+    provider.fetch.return_value = None
+    fp.providers = [provider]
+    got = fp.fetch("BBCA", "6mo", True)
+    assert got is not None, "cache segar harus dipakai tanpa memanggil provider"
+    provider.fetch.assert_not_called()
+
+
+def test_expired_cache_calls_provider():
+    from unittest.mock import Mock
+    from app.tools import FallbackProvider
+    d = _empty_cache_dir()
+    provider = Mock()
+    provider.fetch.return_value = None
+    fp = FallbackProvider(providers=[provider], cache=ProviderCache(cache_dir=d, ttl_hours=0))
+    fp.cache.save("BBCA", "6mo", True, _mock_data())
+    fp.fetch("BBCA", "6mo", True)
+    provider.fetch.assert_called_once()
+
+
+def test_financials_disk_cache_skips_provider():
+    from unittest.mock import Mock
+    from app.tools import FallbackProvider
+    d = _empty_cache_dir()
+    fp = FallbackProvider(providers=[], cache=ProviderCache(cache_dir=d))
+    provider = Mock()
+    provider.fetch_financials.return_value = {"financials": {"2025-01-01": {"Total Revenue": 1e14}}}
+    fp.providers = [provider]
+    fp.fetch_financials("BBCA")
+    fp.fetch_financials("BBCA")
+    assert provider.fetch_financials.call_count == 1, "cache disk harus mencegah fetch ulang"
+
+
+def test_financials_json_ttl_longer_than_price():
+    d = _empty_cache_dir()
+    c = ProviderCache(cache_dir=d, ttl_hours=24)
+    c.save_json("BBCA_financials", {"a": 1})
+    assert c.load_json("BBCA_financials") is not None
+    assert c.load_json("BBCA_financials", ttl_hours=0) is None

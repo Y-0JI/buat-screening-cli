@@ -42,7 +42,7 @@ def build_data_quality_report(data: StockData) -> dict:
 
     caveats = []
     if days_since is not None and days_since > 3:
-        caveats.append(f"Data terakhir {days_since} hari lalu ({last_trade}). Analisis mungkin tidak反映 kondisi terkini.")
+        caveats.append(f"Data terakhir {days_since} hari lalu ({last_trade}). Analisis mungkin tidak mencerminkan kondisi pasar terkini.")
     if missing:
         caveats.append(f"Indikator belum tersedia: {', '.join(missing)}. Kesimpulan tentang indikator ini mungkin tidak akurat.")
 
