@@ -10,6 +10,8 @@ from app.models.symbol import SymbolInfo
 from app.tools.base import Provider, _classify_error
 from app.tools.registry import ProviderRegistry
 
+# ponytail: shared rate-limit cooldown without a lock; safe at 2 parallel workers
+# (bulk_screen ThreadPoolExecutor max_workers=2). Add a lock if workers increase.
 _last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
 

@@ -25,6 +25,10 @@ class FallbackProvider:
         if not is_valid(ticker):
             logger.warning(f"Invalid symbol rejected: {ticker}")
             return None
+        cached = self.cache.load(ticker, period, need_profile)
+        if cached:
+            logger.debug(f"Fresh cache HIT: {ticker} ({period}) — skipping provider")
+            return cached
         for provider in self.providers:
             name = type(provider).__name__
             try:

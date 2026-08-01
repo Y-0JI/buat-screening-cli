@@ -55,3 +55,29 @@ def test_cache_stale():
     c.save("BBCA", "6mo", True, _mock_data())
     loaded = c.load("BBCA", "6mo", True, allow_stale=True)
     assert loaded is not None
+
+
+def test_fresh_cache_skips_provider():
+    from unittest.mock import Mock
+    from app.tools import FallbackProvider
+    d = _empty_cache_dir()
+    fp = FallbackProvider(providers=[], cache=ProviderCache(cache_dir=d, ttl_hours=24))
+    fp.cache.save("BBCA", "6mo", True, _mock_data())
+    provider = Mock()
+    provider.fetch.return_value = None
+    fp.providers = [provider]
+    got = fp.fetch("BBCA", "6mo", True)
+    assert got is not None, "cache segar harus dipakai tanpa memanggil provider"
+    provider.fetch.assert_not_called()
+
+
+def test_expired_cache_calls_provider():
+    from unittest.mock import Mock
+    from app.tools import FallbackProvider
+    d = _empty_cache_dir()
+    provider = Mock()
+    provider.fetch.return_value = None
+    fp = FallbackProvider(providers=[provider], cache=ProviderCache(cache_dir=d, ttl_hours=0))
+    fp.cache.save("BBCA", "6mo", True, _mock_data())
+    fp.fetch("BBCA", "6mo", True)
+    provider.fetch.assert_called_once()

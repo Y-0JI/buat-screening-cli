@@ -20,6 +20,7 @@ def test_fallback_primary_success():
     p1.fetch.return_value = _mock_data()
     p2 = MagicMock()
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("BBCA")
     assert result is not None
@@ -34,6 +35,7 @@ def test_fallback_to_secondary():
     p2 = MagicMock()
     p2.fetch.return_value = _mock_data("BBRI")
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("BBRI")
     assert result is not None
@@ -55,6 +57,8 @@ def test_fallback_all_fail_cached():
     assert result is not None
     assert result.info.ticker == "CACHED"
     cache.load.assert_called_once()
+    p1.fetch.assert_not_called()
+    p2.fetch.assert_not_called()
 
 
 def test_fallback_all_fail_no_cache():

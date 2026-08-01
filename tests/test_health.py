@@ -31,6 +31,7 @@ def test_health_summary_tracks_success():
     p1.fetch.return_value = _mock_data()
     p2 = MagicMock()
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     fb.fetch("BBCA")
     h = fb.health_summary()
@@ -58,6 +59,7 @@ def test_health_summary_tracks_rate_limited():
     p2 = MagicMock()
     p2.fetch.return_value = _mock_data("BBRI")
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     fb.fetch("BBCA")
     h = fb.health_summary()

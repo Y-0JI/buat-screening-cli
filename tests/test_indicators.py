@@ -1,7 +1,7 @@
 from datetime import date
 import pytest
 from app.models.stock import HistoricalPrice
-from app.indicators.engine import sma, ema, rsi, macd, bollinger
+from app.indicators.engine import sma, ema, rsi, macd, bollinger, _ema_raw
 
 
 def _make_prices(closes: list[float]) -> list[HistoricalPrice]:
@@ -74,6 +74,23 @@ class TestMACD:
     def test_macd_short_data(self):
         result = macd(_make_prices([1, 2, 3]))
         assert all(r is None for r in result)
+
+    def test_macd_signal_is_ema9_of_macd_line(self):
+        # signal = EMA9 dari garis MACD (standar), bukan simple average
+        closes = [float(i) * 1.7 + 50 for i in range(120)]
+        result = macd(_make_prices(closes))
+        valid = [r for r in result if r is not None]
+        c = [p.close for p in _make_prices(closes)]
+        ema12 = _ema_raw(c, 12)
+        ema26 = _ema_raw(c, 26)
+        m = [a - b for a, b in zip(ema12, ema26) if a is not None and b is not None]
+        k = 2 / 10
+        sig = [sum(m[:9]) / 9]
+        for v in m[9:]:
+            sig.append(v * k + sig[-1] * (1 - k))
+        assert len(valid) == len(sig)
+        for got, expected in zip(valid, sig):
+            assert got["signal"] == pytest.approx(round(expected, 4), abs=0.001)
 
 
 class TestBollinger:

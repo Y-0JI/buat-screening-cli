@@ -76,15 +76,14 @@ def macd(prices: list[HistoricalPrice]) -> list[dict | None]:
     for i in range(len(c)):
         if ema12[i] is None or ema26[i] is None:
             result.append(None)
-            macd_line_values.append(0.0)
+            continue
+        macd_val = ema12[i] - ema26[i]
+        macd_line_values.append(macd_val)
+        if len(macd_line_values) < 9:
+            result.append(None)
         else:
-            macd_val = ema12[i] - ema26[i]
-            macd_line_values.append(macd_val)
-            if len(macd_line_values) < 10:
-                result.append(None)
-            else:
-                signal = sum(macd_line_values[-9:]) / 9
-                result.append({"macd": round(macd_val, 4), "signal": round(signal, 4), "histogram": round(macd_val - signal, 4)})
+            signal = _ema_raw(macd_line_values, 9)[-1]
+            result.append({"macd": round(macd_val, 4), "signal": round(signal, 4), "histogram": round(macd_val - signal, 4)})
     return result
 
 
