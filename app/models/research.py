@@ -38,6 +38,10 @@ REPORT_SECTION_LABELS = {
 
 SCHEMA_VERSION = 1
 
+REASON_NEWS_UNAVAILABLE = "news_unavailable"
+REASON_FINANCIALS_UNAVAILABLE = "financials_unavailable"
+REASON_NO_MARKET_CONTEXT = "no_market_context"
+
 
 class SectionStatus(str, Enum):
     AVAILABLE = "available"
@@ -50,6 +54,7 @@ class ResearchSection:
     source: str = ""
     status: SectionStatus = SectionStatus.MISSING
     data: dict = field(default_factory=dict)
+    reason: str = ""
 
 
 @dataclass(frozen=True)

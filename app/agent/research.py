@@ -8,8 +8,16 @@ from app.parser.intent import detect_research_intent, ResearchIntent
 from app.memory import get_store
 from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
-from app.models.research import REPORT_SECTION_LABELS, REPORT_SECTIONS, ResearchData, ResearchSection, SectionStatus
-from app.agent.enrichment import compute_price_position, compute_volatility, enrich_financials
+from app.models.research import (
+    REASON_NEWS_UNAVAILABLE,
+    REASON_NO_MARKET_CONTEXT,
+    REPORT_SECTION_LABELS,
+    REPORT_SECTIONS,
+    ResearchData,
+    ResearchSection,
+    SectionStatus,
+)
+from app.agent.enrichment import compute_price_position, compute_technical_context, compute_volatility, enrich_financials
 from app.tools import get_provider
 
 _financials_cache: dict[str, dict] = {}
@@ -36,10 +44,53 @@ class ResearchReport:
     ai_failed: bool = False
 
 
-def _mark_available(sections: dict[str, ResearchSection], key: str, source: str = "yahoo") -> dict:
+def _mark_available(sections: dict[str, ResearchSection], key: str, source: str = "yfinance.info") -> dict:
     if sections[key].status == SectionStatus.MISSING:
         sections[key] = ResearchSection(source=source, status=SectionStatus.AVAILABLE)
     return sections[key].data
+
+
+def enrich_market_intelligence(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
+    """Market Intelligence container: market context (real data only), analyst sentiment,
+    technical context (numbers only), news availability. Deterministic."""
+    for ticker, a in (analyses or {}).items():
+        if not (a.raw_data and a.raw_data.history):
+            continue
+        info = a.raw_data.info
+        fund = info.fundamentals or {}
+        slot: dict = {}
+
+        if rd.sections["market"].status == SectionStatus.AVAILABLE:
+            slot["market_context"] = {"available": True, "source": "screening"}
+        else:
+            slot["market_context"] = {"available": False, "reason": REASON_NO_MARKET_CONTEXT}
+
+        analyst = {}
+        for k, label in (
+            ("recommendationKey", "recommendation_key"),
+            ("recommendationMean", "recommendation_mean"),
+            ("targetMeanPrice", "target_mean"),
+            ("targetHighPrice", "target_high"),
+            ("targetLowPrice", "target_low"),
+        ):
+            if fund.get(k) is not None:
+                analyst[label] = fund[k]
+        if analyst:
+            slot["analyst_sentiment"] = analyst
+
+        tech = compute_technical_context(a.raw_data.history, fund.get("52WeekChange"))
+        if tech:
+            slot["technical_context"] = tech
+
+        slot["news_availability"] = {"status": "unavailable", "reason": REASON_NEWS_UNAVAILABLE}
+
+        if slot:
+            rd.sections["market_intelligence"] = ResearchSection(
+                source="yfinance.info; derived(price_history)",
+                status=SectionStatus.PARTIAL,
+                reason=REASON_NEWS_UNAVAILABLE,
+                data={ticker: slot},
+            )
 
 
 def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
@@ -51,22 +102,29 @@ def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | Non
         info = a.raw_data.info
         price = hist[-1].close
 
-        price_data = _mark_available(rd.sections, "price", source="yahoo info")
+        price_data = _mark_available(rd.sections, "price", source="yfinance.info")
         price_data.setdefault(ticker, {})
         fund = info.fundamentals or {}
         price_data[ticker].update(compute_price_position(price, fund.get("fiftyTwoWeekHigh"), fund.get("fiftyTwoWeekLow")))
 
         vol = compute_volatility([p.close for p in hist])
         if vol is not None:
-            risk_data = _mark_available(rd.sections, "risk", source="derived")
+            risk_data = _mark_available(rd.sections, "risk", source="derived(price_history)")
             risk_data.setdefault(ticker, {})["volatility_annual_pct"] = vol
 
         raw = _get_financials(ticker)
         if raw:
             metrics = enrich_financials(raw)
             if metrics:
-                fin_data = _mark_available(rd.sections, "financial", source="yahoo financials")
+                fin_data = _mark_available(rd.sections, "financial", source="yfinance.financials")
                 fin_data[ticker] = metrics
+            else:
+                rd.sections["financial"] = ResearchSection(
+                    source="yfinance.financials",
+                    status=SectionStatus.PARTIAL,
+                    reason=REASON_FINANCIALS_UNAVAILABLE,
+                    data=rd.sections["financial"].data,
+                )
 
 
 def build_research_data(intent: ResearchIntent, screening_results, analyses, comparison, data_quality) -> ResearchData:
@@ -80,7 +138,7 @@ def build_research_data(intent: ResearchIntent, screening_results, analyses, com
         )
 
     if comparison and comparison.get("analysis"):
-        comp = _mark_available(sections, "comparison")
+        comp = _mark_available(sections, "comparison", source="ai")
         comp["analysis"] = _trim_analysis(comparison.get("analysis", ""))
 
     for ticker, a in (analyses or {}).items():
@@ -202,6 +260,7 @@ def run_research(query: str) -> ResearchReport:
 
     research_data = build_research_data(intent, screening_results, analyses, comparison, data_quality)
     enrich_research_data(research_data, analyses)
+    enrich_market_intelligence(research_data, analyses)
 
     user_prompt = build_report_prompt(research_data)
     system_prompt = _build_system_prompt()
@@ -343,6 +402,37 @@ def _serialize_financial(data: dict) -> list[str]:
     return lines
 
 
+def _serialize_market_intelligence(data: dict) -> list[str]:
+    lines = []
+    for ticker, slot in data.items():
+        parts = []
+        ctx = slot.get("market_context")
+        if ctx and ctx.get("available"):
+            parts.append("konteks pasar tersedia (screening)")
+        analyst = slot.get("analyst_sentiment")
+        if analyst:
+            mean = analyst.get("recommendation_mean")
+            target = analyst.get("target_mean")
+            parts.append(f"analis {analyst.get('recommendation_key', 'n/a')}" + (f" ({mean})" if mean is not None else "") + (f", target {target}" if target is not None else ""))
+        tech = slot.get("technical_context")
+        if tech:
+            bits = []
+            if tech.get("vs_sma20_pct") is not None:
+                bits.append(f"+{tech['vs_sma20_pct']}% vs SMA20" if tech["vs_sma20_pct"] >= 0 else f"{tech['vs_sma20_pct']}% vs SMA20")
+            if tech.get("vs_sma50_pct") is not None:
+                bits.append(f"{tech['vs_sma50_pct']:+}% vs SMA50")
+            if tech.get("week52_change_pct") is not None:
+                bits.append(f"52w {tech['week52_change_pct']:+.1f}%")
+            if bits:
+                parts.append("teknikal: " + ", ".join(bits))
+        news = slot.get("news_availability", {})
+        if news.get("status") == "unavailable":
+            parts.append(f"berita: tidak tersedia ({news.get('reason', '')})")
+        if parts:
+            lines.append(f"- {ticker}: " + "; ".join(parts))
+    return lines
+
+
 def _serialize_section_data(data: dict) -> list[str]:
     out = []
     for key, val in data.items():
@@ -375,6 +465,8 @@ def serialize_research_data(rd: ResearchData) -> str:
             lines.append(f"- {len(results)} kandidat; top: {top}")
         elif key == "financial":
             lines.extend(_serialize_financial(sec.data))
+        elif key == "market_intelligence":
+            lines.extend(_serialize_market_intelligence(sec.data))
         else:
             lines.extend(_serialize_section_data(sec.data))
     lines.append("## Rekomendasi")
