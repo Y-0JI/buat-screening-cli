@@ -2,7 +2,50 @@ import math
 from statistics import stdev
 
 from app.indicators.engine import sma
+from app.models.research import SectionStatus
 from app.models.stock import HistoricalPrice
+
+# Confidence algorithm (deterministic, auditable):
+# - weights: available=1.0, partial=0.5, missing=0.0 (equal across relevant sections)
+# - intent-aware: sections irrelevant to the research type are excluded from the
+#   denominator (e.g. market context for single-stock research)
+# - score = sum(weights) / count(relevant); high >= 0.8, medium >= 0.5, low < 0.5
+_SECTION_WEIGHTS = {
+    SectionStatus.AVAILABLE: 1.0,
+    SectionStatus.PARTIAL: 0.5,
+    SectionStatus.MISSING: 0.0,
+}
+_HIGH_THRESHOLD = 0.8
+_MEDIUM_THRESHOLD = 0.5
+
+_INTENT_RELEVANT_SECTIONS = {
+    "single_stock": ("company", "price", "technical", "risk", "fundamental", "financial", "valuation", "growth", "dividend", "market_intelligence"),
+    "analyze_only": ("company", "price", "technical", "risk", "fundamental", "financial", "valuation", "growth", "dividend", "market_intelligence"),
+    "sector_theme": ("market", "company", "price", "technical", "risk", "fundamental", "financial", "valuation", "growth", "dividend", "market_intelligence"),
+    "comparative": ("company", "price", "technical", "comparison", "risk", "fundamental", "financial", "valuation", "growth", "dividend", "market_intelligence"),
+}
+
+
+def compute_confidence(intent_type: str, sections: dict) -> dict:
+    """Confidence = data completeness/quality, NOT recommendation strength.
+    Returns score, level, per-section breakdown and score reducers."""
+    keys = _INTENT_RELEVANT_SECTIONS.get(intent_type, ())
+    breakdown = {}
+    weighted = 0.0
+    for key in keys:
+        sec = sections[key]
+        weight = _SECTION_WEIGHTS.get(sec.status, 0.0)
+        weighted += weight
+        breakdown[key] = {"status": sec.status.value, "weight": weight, "reason": sec.reason}
+    score = round(weighted / len(keys), 2) if keys else 0.0
+    level = "high" if score >= _HIGH_THRESHOLD else "medium" if score >= _MEDIUM_THRESHOLD else "low"
+    return {
+        "confidence_level": level,
+        "confidence_score": score,
+        "confidence_breakdown": breakdown,
+        "missing_sections": {k: v["reason"] for k, v in breakdown.items() if v["status"] == "missing"},
+        "partial_sections": {k: v["reason"] for k, v in breakdown.items() if v["status"] == "partial"},
+    }
 
 
 def compute_volatility(closes: list[float], window: int = 30) -> float | None:

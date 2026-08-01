@@ -98,6 +98,16 @@ class RichPresenter:
             rec_text = "\n".join(f"{i+1}. {r}" for i, r in enumerate(report.recommendations))
             console.print(Panel(rec_text, title="[bold green]Rekomendasi[/bold green]", border_style="green"))
 
+        if rd and rd.sections.get("investment_conclusion") and rd.sections["investment_conclusion"].data:
+            conf = rd.sections["investment_conclusion"].data.get("confidence", {})
+            lines = [f"Level: {conf.get('confidence_level', '?')} (skor {conf.get('confidence_score', '?')})"]
+            for label, key in (("Mengurangi", "missing_sections"), ("Sebagian", "partial_sections")):
+                items = conf.get(key) or {}
+                if items:
+                    lines.append(f"{label}: " + ", ".join(f"{k} ({r})" if r else k for k, r in items.items()))
+            console.print()
+            console.print(Panel("\n".join(lines), title="[bold]Confidence (kelengkapan data)[/bold]", border_style="magenta"))
+
     def error(self, message: str) -> None:
         console.print(f"[bold red]Error:[/bold red] {message}")
 

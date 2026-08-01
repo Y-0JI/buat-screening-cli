@@ -309,7 +309,13 @@ _RAW_FIN = {
 
 def _rd_with_data(fundamentals=None, raw_fin=None):
     from app.agent.enrichment import enrich_financials
-    from app.agent.research import _financials_cache, build_research_data, enrich_research_data, enrich_market_intelligence
+    from app.agent.research import (
+        _financials_cache,
+        build_research_data,
+        enrich_investment_conclusion,
+        enrich_market_intelligence,
+        enrich_research_data,
+    )
     from app.parser.intent import ResearchIntent
     _financials_cache.clear()
     a = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={"RSI": "53.8"}, raw_data=_mock_stock_data(), screening_results=None)
@@ -322,6 +328,7 @@ def _rd_with_data(fundamentals=None, raw_fin=None):
         mock_provider.return_value.fetch_financials.return_value = raw_fin if raw_fin is not None else _RAW_FIN
         enrich_research_data(rd, {"BBCA": a})
     enrich_market_intelligence(rd, {"BBCA": a})
+    enrich_investment_conclusion(rd, "single_stock", {"BBCA": a})
     _financials_cache.clear()
     return rd
 
@@ -410,6 +417,41 @@ def test_market_intelligence_in_prompt_concise():
     assert "analis strong_buy (1.38), target 8074.84" in prompt
     assert "berita: tidak tersedia (news_unavailable)" in prompt
     assert "analyst_sentiment" not in prompt, "key internal tidak boleh bocor ke prompt"
+
+
+def test_confidence_deterministic_intent_aware_with_breakdown():
+    from app.agent.enrichment import compute_confidence
+    rd = _rd_with_data()
+    c1 = compute_confidence("single_stock", rd.sections)
+    c2 = compute_confidence("single_stock", rd.sections)
+    assert c1 == c2, "confidence harus deterministik"
+    assert c1["confidence_level"] == "high", f"single stock dengan 9/10 available harus high, dapat {c1}"
+    assert "market" not in c1["confidence_breakdown"], "market tidak relevan untuk single stock"
+    assert c1["confidence_breakdown"]["company"]["weight"] == 1.0
+    assert c1["confidence_breakdown"]["market_intelligence"]["status"] == "partial"
+    assert c1["missing_sections"] == {}
+    sector = compute_confidence("sector_theme", rd.sections)
+    assert "market" in sector["confidence_breakdown"] and "comparison" not in sector["confidence_breakdown"]
+
+
+def test_investment_conclusion_structured_in_contract():
+    rd = _rd_with_data()
+    ic = rd.sections["investment_conclusion"]
+    assert ic.status.value == "available" and ic.source == "derived(platform)"
+    conf = ic.data["confidence"]
+    assert set(conf) == {"confidence_level", "confidence_score", "confidence_breakdown", "missing_sections", "partial_sections"}
+    ctx = ic.data["score_context"]["BBCA"]
+    assert "indicators" in ctx and "analyst_sentiment" in ctx
+    assert "bullish" not in str(ctx).lower(), "score_context harus angka/label terstruktur, tanpa kalimat"
+
+
+def test_prompt_includes_conclusion_and_traceability_rule():
+    from app.agent.research import build_report_prompt
+    rd = _rd_with_data()
+    prompt = build_report_prompt(rd)
+    assert "## Investment Conclusion" in prompt
+    assert "confidence_level: high (skor 0.95)" in prompt
+    assert "HARUS menyebut angka/indikator pendukung" in prompt, "aturan traceability harus ada di prompt"
 
 
 def test_research_failed_no_memory_entry():

@@ -17,7 +17,13 @@ from app.models.research import (
     ResearchSection,
     SectionStatus,
 )
-from app.agent.enrichment import compute_price_position, compute_technical_context, compute_volatility, enrich_financials
+from app.agent.enrichment import (
+    compute_confidence,
+    compute_price_position,
+    compute_technical_context,
+    compute_volatility,
+    enrich_financials,
+)
 from app.tools import get_provider
 
 _financials_cache: dict[str, dict] = {}
@@ -42,6 +48,37 @@ class ResearchReport:
     failed: list[str] = field(default_factory=list)
     research_data: ResearchData | None = None
     ai_failed: bool = False
+
+
+def build_score_context(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> dict:
+    """Structured numbers only — no sentences, no duplicate of AI output."""
+    ctx = {}
+    for ticker, a in (analyses or {}).items():
+        slot: dict = {}
+        tech = rd.sections["technical"].data.get(ticker, {})
+        if tech.get("key_metrics"):
+            slot["indicators"] = tech["key_metrics"]
+        mi = rd.sections["market_intelligence"].data.get(ticker, {})
+        if mi.get("analyst_sentiment"):
+            slot["analyst_sentiment"] = mi["analyst_sentiment"]
+        if mi.get("technical_context"):
+            slot["technical_context"] = mi["technical_context"]
+        if slot:
+            ctx[ticker] = slot
+    return ctx
+
+
+def enrich_investment_conclusion(rd: ResearchData, intent_type: str, analyses: dict[str, AIAnalysis] | None) -> None:
+    """Platform-computed confidence + structured score context into the contract."""
+    conf = compute_confidence(intent_type, rd.sections)
+    ctx = build_score_context(rd, analyses)
+    if not ctx and conf["confidence_score"] == 0.0:
+        return
+    rd.sections["investment_conclusion"] = ResearchSection(
+        source="derived(platform)",
+        status=SectionStatus.AVAILABLE,
+        data={"confidence": conf, "score_context": ctx},
+    )
 
 
 def _mark_available(sections: dict[str, ResearchSection], key: str, source: str = "yfinance.info") -> dict:
@@ -261,6 +298,7 @@ def run_research(query: str) -> ResearchReport:
     research_data = build_research_data(intent, screening_results, analyses, comparison, data_quality)
     enrich_research_data(research_data, analyses)
     enrich_market_intelligence(research_data, analyses)
+    enrich_investment_conclusion(research_data, intent.type, analyses)
 
     user_prompt = build_report_prompt(research_data)
     system_prompt = _build_system_prompt()
@@ -402,6 +440,37 @@ def _serialize_financial(data: dict) -> list[str]:
     return lines
 
 
+def _serialize_conclusion(data: dict) -> list[str]:
+    lines = []
+    conf = data.get("confidence", {})
+    lines.append(f"- confidence_level: {conf.get('confidence_level')} (skor {conf.get('confidence_score')})")
+    for label, reducer in (("pengurang", "missing_sections"), ("sebagian", "partial_sections")):
+        items = conf.get(reducer) or {}
+        if items:
+            lines.append(f"- {label}: " + ", ".join(f"{k} ({r})" if r else k for k, r in items.items()))
+    for ticker, ctx in (data.get("score_context") or {}).items():
+        bits = []
+        ind = ctx.get("indicators")
+        if ind:
+            bits.append(", ".join(f"{k}={v}" for k, v in ind.items()))
+        analyst = ctx.get("analyst_sentiment")
+        if analyst:
+            mean = analyst.get("recommendation_mean")
+            target = analyst.get("target_mean")
+            bits.append("analis " + analyst.get("recommendation_key", "n/a") + (f" ({mean})" if mean is not None else "") + (f", target {target}" if target is not None else ""))
+        tech = ctx.get("technical_context")
+        if tech:
+            vals = []
+            for key in ("vs_sma20_pct", "vs_sma50_pct", "week52_change_pct"):
+                if tech.get(key) is not None:
+                    vals.append(f"{key}={tech[key]}")
+            if vals:
+                bits.append("teknikal: " + ", ".join(vals))
+        if bits:
+            lines.append(f"- {ticker}: " + "; ".join(bits))
+    return lines
+
+
 def _serialize_market_intelligence(data: dict) -> list[str]:
     lines = []
     for ticker, slot in data.items():
@@ -450,7 +519,7 @@ def serialize_research_data(rd: ResearchData) -> str:
     """Deterministic, token-thin serialization: available/partial sections only."""
     lines = ["## Ringkasan Eksekutif"]
     for key in REPORT_SECTIONS:
-        if key in ("executive_summary", "investment_conclusion"):
+        if key == "executive_summary":
             continue
         sec = rd.sections[key]
         if sec.status == SectionStatus.MISSING:
@@ -467,6 +536,8 @@ def serialize_research_data(rd: ResearchData) -> str:
             lines.extend(_serialize_financial(sec.data))
         elif key == "market_intelligence":
             lines.extend(_serialize_market_intelligence(sec.data))
+        elif key == "investment_conclusion":
+            lines.extend(_serialize_conclusion(sec.data))
         else:
             lines.extend(_serialize_section_data(sec.data))
     lines.append("## Rekomendasi")
