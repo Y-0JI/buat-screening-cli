@@ -182,7 +182,7 @@ def test_research_saves_summary_to_memory():
                     run_research("analisa BBCA")
     entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source.startswith("research:")]
     assert entries, "riset sukses harus menyimpan entri memori"
-    assert "Riset single_stock" in entries[0].content
+    assert "Laporan riset (single_stock)" in entries[0].content
 
 
 def test_compare_two_pairs_both_in_memory():
@@ -233,7 +233,7 @@ def test_build_research_data_fills_sections():
         screening_results=None,
     )
     a.raw_data.info.fundamentals = {"trailingPE": 13.4, "returnOnEquity": 0.22, "dividendYield": 5.63, "priceToBook": 3.0}
-    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, {"BBCA": ["Data lama"]})
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, None, {"BBCA": ["Data lama"]})
     assert rd.schema_version == 1
     assert rd.sections["company"].status == SectionStatus.AVAILABLE
     assert rd.sections["company"].data["BBCA"]["sector"] == "Finance"
@@ -251,7 +251,7 @@ def test_build_research_data_immutable():
     from dataclasses import FrozenInstanceError
     from app.agent.research import build_research_data
     from app.parser.intent import ResearchIntent
-    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, None, {})
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, None, None, {})
     try:
         rd.symbol = "XX"
         assert False, "ResearchData harus read-only setelah normalisasi"
@@ -263,6 +263,28 @@ def test_extract_fundamentals_filters_placeholders():
     from app.tools.yahoo_finance import _extract_fundamentals
     out = _extract_fundamentals({"trailingPE": 13.4, "beta": 0.0, "profitMargins": 0.0, "totalDebt": 0, "recommendationKey": "strong_buy", "missing": None})
     assert out == {"trailingPE": 13.4, "recommendationKey": "strong_buy"}
+
+
+def test_research_ai_failure_falls_back_and_keeps_research_data():
+    import tempfile
+    from app.memory import MemoryStore
+    from app.models.research import SectionStatus
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    store = MemoryStore(path=path)
+    with patch("app.agent.research.get_store", return_value=store):
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = _mock_stock_data()
+            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes", raw_data=_mock_stock_data())
+                with patch("app.agent.research.chat_completion") as mock_llm:
+                    mock_llm.return_value = None
+                    report = run_research("analisa BBCA")
+    assert report.ai_failed is True
+    assert report.research_data is not None, "ResearchData harus tetap tersimpan walau AI gagal"
+    assert report.research_data.sections["company"].status == SectionStatus.AVAILABLE
+    assert "otomatis" in report.executive_summary
+    assert store.count() == 0, "AI gagal tidak boleh menyimpan laporan"
 
 
 def test_research_failed_no_memory_entry():
@@ -280,18 +302,31 @@ def test_research_failed_no_memory_entry():
     assert store.count() == 0
 
 
-def test_screening_prompt_rendered_cleanly():
-    from app.agent.research import _render_report_prompt
+def test_report_prompt_rendered_cleanly():
+    from app.agent.research import build_report_prompt, build_research_data
     from app.parser.intent import ResearchIntent
     from app.screeners.engine import ScreeningResult
     scr = [
         {"ticker": "BBCA", "sector": "Financials", "top_signal": ScreeningResult(ticker="BBCA", signal="BUY", confidence=0.85, reason="harga di atas EMA20"), "max_confidence": 0.85},
         {"ticker": "BBRI", "sector": "Financials", "top_signal": None, "max_confidence": 0},
     ]
-    prompt = _render_report_prompt("{{context}}", ResearchIntent("sector_theme", [], None, "q"), scr, None, None, {})
-    assert "if ts else" not in prompt
-    assert "- BBCA (Financials): BUY (85%) - harga di atas EMA20" in prompt
-    assert "- BBRI (Financials): N/A" in prompt
+    rd = build_research_data(ResearchIntent("sector_theme", [], None, "q"), scr, None, None, {})
+    prompt = build_report_prompt(rd)
+    assert "{{" not in prompt and "if ts else" not in prompt
+    assert "## Market Overview" in prompt
+    assert "2 kandidat" in prompt
+    assert "financial" not in prompt.lower().replace("## ", ""), "section missing tidak boleh masuk input AI"
+    assert "## Ringkasan Eksekutif" in prompt and "## Rekomendasi" in prompt
+
+
+def test_report_prompt_deterministic_and_skip_missing():
+    from app.agent.research import build_report_prompt, build_research_data
+    from app.parser.intent import ResearchIntent
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, None, None, {})
+    p1 = build_report_prompt(rd)
+    p2 = build_report_prompt(rd)
+    assert p1 == p2, "input ResearchData sama -> prompt harus identik"
+    assert "## Financial" not in p1 and "## Market Intelligence" not in p1, "section missing tidak boleh dikirim ke AI"
 
 
 def test_extract_sections_variants():

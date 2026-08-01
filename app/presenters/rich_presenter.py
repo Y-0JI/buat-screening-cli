@@ -39,15 +39,29 @@ class RichPresenter:
         console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
         console.print(f"[bold]Query:[/bold] {report.intent.raw_query}")
         console.print(f"[bold]Tipe Riset:[/bold] {report.intent.type}")
+        rd = report.research_data
+        if rd:
+            console.print(f"[bold]Simbol:[/bold] {rd.symbol}")
+            console.print(f"[bold]Waktu dibuat:[/bold] {rd.created_at.strftime('%Y-%m-%d %H:%M UTC')}")
         console.print()
 
         if report.failed:
             console.print(f"[yellow]⚠ Gagal memuat data: {', '.join(report.failed)}[/yellow]")
             console.print()
 
+        if report.ai_failed:
+            console.print("[yellow]⚠ AI tidak tersedia — laporan otomatis dari data terkini. ResearchData tetap tersimpan untuk regenerasi.[/yellow]")
+            console.print()
+
         if report.executive_summary:
             console.print(Panel(report.executive_summary, title="[bold]Ringkasan Eksekutif[/bold]", border_style="cyan"))
             console.print()
+
+        if rd:
+            missing = [k.replace("_", " ") for k, s in rd.sections.items() if s.status.value == "missing"]
+            if missing:
+                console.print(f"[dim]Data tidak tersedia: {', '.join(missing)}[/dim]")
+                console.print()
 
         if report.screening_results:
             table = Table(title="Hasil Screening")

@@ -8,7 +8,7 @@ from app.parser.intent import detect_research_intent, ResearchIntent
 from app.memory import get_store
 from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
-from app.models.research import REPORT_SECTIONS, ResearchData, ResearchSection, SectionStatus
+from app.models.research import REPORT_SECTION_LABELS, REPORT_SECTIONS, ResearchData, ResearchSection, SectionStatus
 
 
 @dataclass
@@ -22,6 +22,7 @@ class ResearchReport:
     executive_summary: str
     failed: list[str] = field(default_factory=list)
     research_data: ResearchData | None = None
+    ai_failed: bool = False
 
 
 def _mark_available(sections: dict[str, ResearchSection], key: str, source: str = "yahoo") -> dict:
@@ -30,7 +31,7 @@ def _mark_available(sections: dict[str, ResearchSection], key: str, source: str 
     return sections[key].data
 
 
-def build_research_data(intent: ResearchIntent, screening_results, analyses, data_quality) -> ResearchData:
+def build_research_data(intent: ResearchIntent, screening_results, analyses, comparison, data_quality) -> ResearchData:
     """Normalize research outputs into the provider-independent ResearchData contract."""
     sections = {key: ResearchSection() for key in REPORT_SECTIONS}
     dq = data_quality or {}
@@ -39,6 +40,10 @@ def build_research_data(intent: ResearchIntent, screening_results, analyses, dat
         sections["market"] = ResearchSection(
             source="screening", status=SectionStatus.AVAILABLE, data={"results": screening_results[:15]}
         )
+
+    if comparison and comparison.get("analysis"):
+        comp = _mark_available(sections, "comparison")
+        comp["analysis"] = _trim_analysis(comparison.get("analysis", ""))
 
     for ticker, a in (analyses or {}).items():
         info = a.raw_data.info if a.raw_data else None
@@ -78,6 +83,8 @@ def build_research_data(intent: ResearchIntent, screening_results, analyses, dat
             price[ticker] = {"price": hist[-1].close, "change_pct": round(change, 2), "volume": hist[-1].volume}
             technical = _mark_available(sections, "technical")
             technical[ticker] = {"key_metrics": a.key_metrics}
+            if a.summary:
+                technical[ticker]["analysis"] = _trim_analysis(a.summary)
             if a.screening_results:
                 technical[ticker]["signals"] = [s.signal for s in a.screening_results]
             if dq.get(ticker):
@@ -155,22 +162,24 @@ def run_research(query: str) -> ResearchReport:
     if failed and not analyses and not screening_results:
         return ResearchReport(intent, None, None, None, data_quality, [], "Laporan riset otomatis berdasarkan data terkini.", failed)
 
-    research_data = build_research_data(intent, screening_results, analyses, data_quality)
+    research_data = build_research_data(intent, screening_results, analyses, comparison, data_quality)
 
-    prompt = _load_prompt("research.md")
-    filled = _render_report_prompt(prompt, intent, screening_results, analyses, comparison, data_quality)
+    user_prompt = build_report_prompt(research_data)
     system_prompt = _build_system_prompt()
     llm_result = chat_completion([
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": filled},
+        {"role": "user", "content": user_prompt},
     ], temperature=0)
 
+    ai_failed = False
     executive_summary = ""
     recommendations = []
     if llm_result:
         sections = _extract_sections(llm_result)
         executive_summary = sections["summary"]
         recommendations = sections["recommendations"]
+    else:
+        ai_failed = True
 
     if not executive_summary:
         executive_summary = "Laporan riset otomatis berdasarkan data terkini."
@@ -178,11 +187,10 @@ def run_research(query: str) -> ResearchReport:
         recommendations = ["Lakukan analisis manual lebih lanjut sebelum keputusan investasi."]
 
     if llm_result:
-        recs = "; ".join(recommendations[:3])
         topic = intent.sector or query.strip()[:50]
         get_store().add_or_update(
             MemoryType.RESEARCH_FINDING,
-            f"Riset {intent.type} '{query[:50]}': {executive_summary.strip()[:150]} Rekomendasi: {recs[:150]}",
+            f"Laporan riset ({intent.type}) '{query[:60]}':\n{llm_result}",
             source=f"research:{intent.type}:{topic}",
         )
 
@@ -196,6 +204,7 @@ def run_research(query: str) -> ResearchReport:
         executive_summary=executive_summary.strip(),
         failed=failed,
         research_data=research_data,
+        ai_failed=ai_failed,
     )
 
 
@@ -249,30 +258,43 @@ def _trim_analysis(text: str, limit: int = 800) -> str:
     return f"{text[:half]}\n[... bagian tengah dipotong ...]\n{text[-half:]}"
 
 
-def _render_report_prompt(template: str, intent: ResearchIntent, screening, analyses, comparison, data_quality) -> str:
-    parts = []
-    parts.append(f"QUERY: {intent.raw_query}")
-    parts.append(f"INTENT: {intent.type}")
+def _serialize_section_data(data: dict) -> list[str]:
+    out = []
+    for key, val in data.items():
+        if isinstance(val, dict):
+            parts = ", ".join(f"{k}={v}" for k, v in val.items() if v is not None)
+            out.append(f"- {key}: {parts}")
+        elif isinstance(val, list):
+            out.append(f"- {key}: " + "; ".join(str(x) for x in val))
+        else:
+            out.append(f"- {key}: {val}")
+    return out
 
-    if screening:
-        parts.append("SCREENING RESULTS:")
-        for r in screening[:10]:
-            ts = r.get("top_signal")
-            if ts:
-                parts.append(f"- {r['ticker']} ({r.get('sector', '-')}): {ts.signal} ({ts.confidence:.0%}) - {ts.reason}")
-            else:
-                parts.append(f"- {r['ticker']} ({r.get('sector', '-')}): N/A")
 
-    if analyses:
-        parts.append("ANALYSES:")
-        for ticker, a in analyses.items():
-            parts.append(f"--- {ticker} ---")
-            parts.append(_trim_analysis(a.summary))
-            if ticker in data_quality:
-                parts.append(f"DATA QUALITY: {', '.join(data_quality[ticker])}")
+def serialize_research_data(rd: ResearchData) -> str:
+    """Deterministic, token-thin serialization: available/partial sections only."""
+    lines = ["## Ringkasan Eksekutif"]
+    for key in REPORT_SECTIONS:
+        if key in ("executive_summary", "investment_conclusion"):
+            continue
+        sec = rd.sections[key]
+        if sec.status == SectionStatus.MISSING:
+            continue
+        lines.append(f"## {REPORT_SECTION_LABELS.get(key, key.replace('_', ' ').title())}")
+        if key == "market":
+            results = sec.data.get("results", [])
+            top = ", ".join(
+                f"{r['ticker']} {r.get('top_signal').signal if r.get('top_signal') else 'N/A'}"
+                for r in results[:5]
+            )
+            lines.append(f"- {len(results)} kandidat; top: {top}")
+        else:
+            lines.extend(_serialize_section_data(sec.data))
+    lines.append("## Rekomendasi")
+    return "\n".join(lines)
 
-    if comparison:
-        parts.append("COMPARISON:")
-        parts.append(comparison.get("analysis", ""))
 
-    return template.replace("{{context}}", "\n".join(parts))
+def build_report_prompt(rd: ResearchData) -> str:
+    """Prompt Builder: ResearchData -> AI message. Deterministic per input."""
+    template = _load_prompt("research.md")
+    return template.replace("{{data}}", serialize_research_data(rd))
