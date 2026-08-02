@@ -109,8 +109,19 @@ def _latest(values: list[tuple[str, float]]) -> float | None:
     return round(values[0][1], 2) if values else None
 
 
-def enrich_financials(raw: dict) -> dict:
-    """Financial statements -> normalized metrics. Deterministic, no raw data kept."""
+def _ratio(numerator: float | None, denominator) -> float | None:
+    if numerator is None or not denominator:
+        return None
+    return round(numerator / denominator, 4)
+
+
+def enrich_financials(raw: dict, price: float | None = None, info_fundamentals: dict | None = None) -> dict:
+    """Financial statements -> normalized metrics. Deterministic, no raw data kept.
+
+    Extra per-share basis (Diluted EPS, Book Value) may arrive in a dedicated
+    `derived` leaf (IDX IDR scale). Ratios that need a currency-consistent
+    price/eps only when authoritative info fields are missing.
+    """
     out = {}
     fin = raw.get("financials", {})
     rev = [v for _, v in _series(fin, "Total Revenue")][:3]
@@ -138,4 +149,52 @@ def enrich_financials(raw: dict) -> dict:
     fcf = _latest(_series(cf, "Free Cash Flow"))
     if fcf is not None:
         out["free_cash_flow"] = {"latest": fcf}
+
+    net_income = (out.get("net_income") or {}).get("latest")
+    revenue = (out.get("revenue") or {}).get("latest")
+    latest_equity = (out.get("equity") or {}).get("latest")
+    der = _ratio(_latest(_series(bs, "Total Liabilities")), latest_equity)
+    if der is not None:
+        out["der"] = der
+    roa = _ratio(net_income, _latest(_series(bs, "Total Assets")))
+    if roa is not None:
+        out["roa"] = roa
+    roe = _ratio(net_income, latest_equity)
+    if roe is not None:
+        out["roe"] = roe
+    npm = _ratio(net_income, revenue)
+    if npm is not None:
+        out["npm"] = npm
+
+    derived = raw.get("derived", {})
+    eps = _latest(_series(derived, "EPS"))
+    if eps is None:
+        eps = _latest(_series(fin, "Diluted EPS"))
+    if eps is None:
+        eps = _latest(_series(fin, "Basic EPS"))
+    per = _per_guard(price, eps, info_fundamentals)
+    if per is not None:
+        out["per"] = per
+    book = _latest(_series(derived, "Book Value"))
+    if book and price:
+        out["pbv"] = _ratio(price, book)
+    elif book is None:
+        info_pb = (info_fundamentals or {}).get("priceToBook")
+        if info_pb is not None and 0 < info_pb <= 200:  # semoga bukan garbage unit 14470
+            out["pbv"] = round(info_pb, 4)
     return out
+
+
+def _per_guard(price: float | None, eps: float | None, info_fundamentals: dict | None) -> float | None:
+    """PER with cross-currency guard.
+
+    Yahoo raw EPS is USD-scale while price is IDR — price/eps from raw can be
+    148k garbage (e.g. ADRO). An authoritative trailingPE in `.info` always
+    wins; raw computation is best-effort only when it is absent.
+    """
+    info_pe = (info_fundamentals or {}).get("trailingPE")
+    if info_pe is not None and info_pe > 0:
+        return round(info_pe, 4)
+    if eps is None or eps <= 0 or not price or price <= 0:
+        return None
+    return round(price / eps, 4)

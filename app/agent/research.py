@@ -87,6 +87,14 @@ def _mark_available(sections: dict[str, ResearchSection], key: str, source: str 
     return sections[key].data
 
 
+def _merge_missing(dst: dict, src: dict) -> dict:
+    """Leaf-level merge: fill keys not already present, keep existing values."""
+    for k, v in src.items():
+        if k not in dst:
+            dst[k] = v
+    return dst
+
+
 def enrich_market_intelligence(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
     """Market Intelligence container: market context (real data only), analyst sentiment,
     technical context (numbers only), news availability. Deterministic."""
@@ -151,10 +159,11 @@ def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | Non
 
         raw = _get_financials(ticker)
         if raw:
-            metrics = enrich_financials(raw)
+            metrics = enrich_financials(raw, price, info.fundamentals)
             if metrics:
                 fin_data = _mark_available(rd.sections, "financial", source="yfinance.financials")
                 fin_data[ticker] = metrics
+                _merge_computed_ratios(rd.sections, ticker, metrics)
             else:
                 rd.sections["financial"] = ResearchSection(
                     source="yfinance.financials",
@@ -162,6 +171,22 @@ def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | Non
                     reason=REASON_FINANCIALS_UNAVAILABLE,
                     data=rd.sections["financial"].data,
                 )
+
+
+def _merge_computed_ratios(sections: dict[str, ResearchSection], ticker: str, metrics: dict) -> None:
+    """Fill fundamental/valuation leaves from computed ratios; existing info wins.
+
+    DER/ROA/ROE/NPM never ship in Yahoo `_FUNDAMENTAL_FIELDS`, so all tickers —
+    including ones already AVAILABLE — get them. Merged per-key, not per-section.
+    """
+    fundamental_extra = {k: metrics[k] for k in ("per", "der", "roa", "roe", "npm") if k in metrics}
+    if fundamental_extra:
+        fund = _mark_available(sections, "fundamental", source="derived(financials)")
+        _merge_missing(fund.setdefault(ticker, {}), fundamental_extra)
+    valuation_extra = {k: metrics[k] for k in ("pbv",) if k in metrics}
+    if valuation_extra:
+        val = _mark_available(sections, "valuation", source="derived(financials)")
+        _merge_missing(val.setdefault(ticker, {}), valuation_extra)
 
 
 def build_research_data(intent: ResearchIntent, screening_results, analyses, comparison, data_quality) -> ResearchData:

@@ -95,6 +95,45 @@ class IDXProvider(Provider):
             logger.warning(f"Gagal get_price IDX {ticker}: {e}")
         return None
 
+    def fetch_financials(self, ticker: str) -> dict:
+        """Per-share data (EPS, Book Value) in IDR, consistent with IDX price.
+
+        Yahoo statements are USD-scale for many non-blue-chip tickers, so
+        price/eps and price/book from Yahoo raw are cross-unit garbage. IDX
+        ratio endpoint publishes per-share numbers in IDR that match the price.
+        Emitted as a dedicated `derived` leaf merged by FallbackProvider.
+        """
+        self._ensure_session()
+        year, month = date.today().year, date.today().month
+        for _ in range(6):  # walk back until a published period is found
+            try:
+                raw = self._session.get(
+                    "https://www.idx.co.id/primary/DigitalStatistic/GetApiDataPaginated",
+                    params={
+                        "urlName": "LINK_FINANCIAL_DATA_RATIO",
+                        "periodYear": year,
+                        "periodMonth": month,
+                        "periodType": "monthly",
+                        "isPrint": "False",
+                        "cumulative": "false",
+                        "pageSize": 1000,
+                    },
+                    impersonate="chrome131",
+                ).json()
+                for row in raw.get("data") or []:
+                    if str(row.get("code", "")).upper() == ticker.upper():
+                        fs = row.get("fsDate")
+                        if not fs:
+                            continue
+                        return {"derived": {fs: {"Diluted EPS": row.get("eps"), "Book Value": row.get("bookValue")}}}
+            except Exception as e:
+                logger.debug(f"Retry IDX financials {ticker} ({year}-{month}): {e}")
+            month -= 1
+            if month < 1:
+                year, month = year - 1, 12
+        logger.warning(f"IDX: financials tidak ditemukan untuk {ticker}")
+        return {}
+
     def _fetch_meta(self, ticker: str) -> dict:
         try:
             raw = self._session.get(

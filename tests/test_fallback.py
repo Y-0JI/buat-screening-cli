@@ -113,3 +113,33 @@ def test_fetch_financials_retries_on_rate_limit():
             out = p.fetch_financials("BBCA")
     assert calls["n"] == 2, "1x rate-limit + 1x retry sukses"
     assert "financials" in out, "rate-limit harus di-retry, bukan langsung gagal"
+
+
+def test_fetch_financials_merges_across_providers():
+    p1 = MagicMock()
+    p1.fetch_financials.return_value = {"financials": {"2026-03-31": {"Total Revenue": 8004.91}}}
+    p2 = MagicMock()
+    p2.fetch_financials.return_value = {"derived": {"2026-03-31": {"Diluted EPS": 286.52, "Book Value": 3136.99}}}
+    cache = MagicMock()
+    cache.load_json.return_value = None
+    fb = FallbackProvider([p1, p2], cache)
+    out = fb.fetch_financials("BBCA")
+    assert out["financials"]["2026-03-31"]["Total Revenue"] == 8004.91
+    assert out["derived"]["2026-03-31"]["Diluted EPS"] == 286.52
+    assert out["derived"]["2026-03-31"]["Book Value"] == 3136.99
+    p1.fetch_financials.assert_called_once()
+    p2.fetch_financials.assert_called_once()
+    cache.save_json.assert_called_once()
+
+
+def test_fetch_financials_no_short_circuit_on_first_truthy():
+    p1 = MagicMock()
+    p1.fetch_financials.return_value = {"financials": {"2026-03-31": {"Total Revenue": 8004.91}}}
+    p2 = MagicMock()
+    p2.fetch_financials.return_value = {"derived": {"2026-03-31": {"Diluted EPS": 286.52}}}
+    cache = MagicMock()
+    cache.load_json.return_value = None
+    fb = FallbackProvider([p1, p2], cache)
+    out = fb.fetch_financials("BBCA")
+    assert p2.fetch_financials.call_count == 1, "provider kedua tetap dipanggil walau yang pertama non-empty"
+    assert "derived" in out

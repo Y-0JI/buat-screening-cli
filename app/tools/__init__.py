@@ -12,6 +12,16 @@ import app.tools.yahoo_finance  # noqa: F401
 import app.tools.idx  # noqa: F401
 
 
+def _deep_merge_first_wins(dst: dict, src: dict) -> None:
+    """Merge src into dst leaf-by-leaf; existing keys win (first provider wins)."""
+    for k, v in src.items():
+        if isinstance(v, dict):
+            dst.setdefault(k, {})
+            _deep_merge_first_wins(dst[k], v)
+        elif k not in dst:
+            dst[k] = v
+
+
 class FallbackProvider:
     def __init__(self, providers: list, cache: ProviderCache):
         self.providers = providers
@@ -90,6 +100,7 @@ class FallbackProvider:
         if cached:
             logger.debug(f"Financials cache HIT: {ticker} — skipping provider")
             return cached
+        merged: dict = {}
         for provider in self.providers:
             fn = getattr(provider, "fetch_financials", None)
             if not fn:
@@ -97,11 +108,12 @@ class FallbackProvider:
             try:
                 out = fn(ticker)
                 if out:
-                    self.cache.save_json(f"{ticker}_financials", out)
-                    return out
+                    _deep_merge_first_wins(merged, out)
             except Exception:
                 continue
-        return {}
+        if merged:
+            self.cache.save_json(f"{ticker}_financials", merged)
+        return merged
 
 
 def get_provider(name: str | None = None):
