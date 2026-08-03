@@ -611,3 +611,30 @@ def _mock_stock_data(days: int = 30):
             for i in range(days)
         ],
     )
+
+
+def test_presenter_renders_section_data_when_ai_failed():
+    from io import StringIO
+    from types import SimpleNamespace
+    from rich.console import Console
+    from app.presenters.rich_presenter import RichPresenter, console as presenter_console
+
+    rd = _rd_with_data(fundamentals={"trailingPE": 21.24, "beta": 1.1}, raw_fin=_ADRO_RAW)
+    report = SimpleNamespace(
+        intent=SimpleNamespace(raw_query="riset BBCA", type="single_stock"),
+        research_data=rd,
+        failed=[],
+        ai_failed=True,
+        executive_summary="",
+        screening_results=None,
+        analyses=None,
+        comparison=None,
+        recommendations=["Lakukan analisis manual lebih lanjut sebelum keputusan investasi."],
+    )
+    buf = StringIO()
+    with patch("app.presenters.rich_presenter.console", Console(file=buf, width=120)):
+        RichPresenter().research_report(report)
+    out = buf.getvalue()
+    assert "Data Terkini" in out, "fallback data harus dirender saat AI gagal"
+    assert "trailingPE=21.24" in out, "nilai fundamental harus tampil di fallback"
+    assert "der=" in out and "roe=" in out, "rasio turunan harus ikut di fallback"
