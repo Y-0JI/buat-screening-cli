@@ -25,6 +25,10 @@ class FallbackProvider:
         if not is_valid(ticker):
             logger.warning(f"Invalid symbol rejected: {ticker}")
             return None
+        cached = self.cache.load(ticker, period, need_profile)
+        if cached:
+            logger.debug(f"Fresh cache HIT: {ticker} ({period}) — skipping provider")
+            return cached
         for provider in self.providers:
             name = type(provider).__name__
             try:
@@ -81,6 +85,11 @@ class FallbackProvider:
         return results
 
     def fetch_financials(self, ticker: str) -> dict:
+        ticker = normalize(ticker)
+        cached = self.cache.load_json(f"{ticker}_financials", ttl_hours=168)  # quarterly data, long TTL
+        if cached:
+            logger.debug(f"Financials cache HIT: {ticker} — skipping provider")
+            return cached
         for provider in self.providers:
             fn = getattr(provider, "fetch_financials", None)
             if not fn:
@@ -88,6 +97,7 @@ class FallbackProvider:
             try:
                 out = fn(ticker)
                 if out:
+                    self.cache.save_json(f"{ticker}_financials", out)
                     return out
             except Exception:
                 continue

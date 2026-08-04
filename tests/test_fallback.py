@@ -20,6 +20,7 @@ def test_fallback_primary_success():
     p1.fetch.return_value = _mock_data()
     p2 = MagicMock()
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("BBCA")
     assert result is not None
@@ -34,6 +35,7 @@ def test_fallback_to_secondary():
     p2 = MagicMock()
     p2.fetch.return_value = _mock_data("BBRI")
     cache = MagicMock()
+    cache.load.return_value = None
     fb = FallbackProvider([p1, p2], cache)
     result = fb.fetch("BBRI")
     assert result is not None
@@ -55,6 +57,8 @@ def test_fallback_all_fail_cached():
     assert result is not None
     assert result.info.ticker == "CACHED"
     cache.load.assert_called_once()
+    p1.fetch.assert_not_called()
+    p2.fetch.assert_not_called()
 
 
 def test_fallback_all_fail_no_cache():
@@ -79,3 +83,33 @@ def test_fallback_rejects_invalid_symbol():
     p1.fetch.assert_not_called()
     p2.fetch.assert_not_called()
     cache.save.assert_not_called()
+
+
+def test_fetch_financials_retries_on_rate_limit():
+    from unittest.mock import Mock, patch
+    from app.tools.yahoo_finance import YahooFinanceProvider
+    calls = {"n": 0}
+
+    class Flaky:
+        @property
+        def financials(self):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise Exception("Too many requests")
+            return Mock(empty=False, to_json=lambda **kw: '{"2025-12-31": {"Total Revenue": 1}}')
+        @property
+        def balance_sheet(self):
+            return Mock(empty=False, to_json=lambda **kw: "{}")
+        @property
+        def cashflow(self):
+            return Mock(empty=False, to_json=lambda **kw: "{}")
+        @property
+        def dividends(self):
+            return Mock(empty=False, to_json=lambda **kw: "{}")
+
+    with patch("app.tools.yahoo_finance.yf.Ticker", return_value=Flaky()):
+        with patch("app.tools.yahoo_finance.time.sleep", return_value=None):
+            p = YahooFinanceProvider()
+            out = p.fetch_financials("BBCA")
+    assert calls["n"] == 2, "1x rate-limit + 1x retry sukses"
+    assert "financials" in out, "rate-limit harus di-retry, bukan langsung gagal"

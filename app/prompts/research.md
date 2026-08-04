@@ -5,7 +5,7 @@ Instruksi:
 2. Jangan ubah judul bagian, jangan tambah bagian baru, jangan tulis judul yang tidak ada di DATA.
 3. Jangan tulis metadata (simbol, tanggal, bursa, mata uang) — itu dikelola sistem.
 4. Bagian "Ringkasan Eksekutif": inti seluruh riset dalam 2-3 kalimat.
-5. Bagian terakhir "Rekomendasi": numbered list (1., 2., ...), tiap poin sebut data pendukungnya.
+5. Bagian terakhir "Rekomendasi": numbered list (1., 2., ...), tiap poin HARUS menyebut angka/indikator pendukung yang ada di DATA — bukan reasoning tanpa evidence.
 6. Hanya pakai data yang diberikan. Jangan invent angka. Jika data kurang, sebutkan keterbatasannya secara singkat.
 
 DATA:
