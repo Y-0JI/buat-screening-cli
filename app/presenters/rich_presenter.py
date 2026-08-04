@@ -53,6 +53,13 @@ class RichPresenter:
             console.print("[yellow]⚠ AI tidak tersedia — laporan otomatis dari data terkini. ResearchData tetap tersimpan untuk regenerasi.[/yellow]")
             console.print()
 
+        if rd and report.ai_failed:
+            from app.agent.research import serialize_research_data
+            fallback = [l for l in serialize_research_data(rd).splitlines() if l not in ("## Ringkasan Eksekutif", "## Rekomendasi")]
+            if fallback:
+                console.print(Panel("\n".join(fallback), title="[bold]Data Terkini (fallback tanpa AI)[/bold]", border_style="blue"))
+                console.print()
+
         if report.executive_summary:
             console.print(Panel(report.executive_summary, title="[bold]Ringkasan Eksekutif[/bold]", border_style="cyan"))
             console.print()
