@@ -37,6 +37,15 @@ class TestParse:
         assert intent == INTENT_ANALYZE
         assert params["ticker"] == "JKON"
 
+    def test_analyze_no_midword_capture(self):
+        intent, params = parse("analisa dulu jkon sekarang")
+        assert intent == INTENT_UNKNOWN
+
+    def test_analyze_valid_ticker_after_noise(self):
+        intent, params = parse("analisa fundamental dari saham tlkm")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "TLKM"
+
     def test_compare(self):
         intent, params = parse("Bandingkan BBCA dan BBRI")
         assert intent == INTENT_COMPARE
