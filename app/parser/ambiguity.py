@@ -16,6 +16,7 @@ class AmbiguityResult:
     ambiguous: bool = False
     reason: str = ""
     candidates: list[str] = field(default_factory=list)
+    invalid: list[str] = field(default_factory=list)
 
 
 def params_tickers(params: dict) -> list[str]:
@@ -66,18 +67,47 @@ _MULTI_INTENT_PATTERNS = [
     ("losers", r"\b(?:losers?|top\s+turun|saham\s+turun|paling\s+turun)\b"),
 ]
 
+# Pemisah KLAUSA yang jelas — dua kata kunci dalam SATU kalimat tanpa pemisah
+# bukan berarti dua maksud ("analisa kondisi breakout BCA" = satu maksud).
+_CLAUSE_SEPARATORS = r"(?:lalu|terus|kemudian|selanjutnya|selain\s+itu|setelah\s+itu|dan\s+juga|serta|tapi|tetapi|namun)"
+
 
 def detect_multi_intent(query: str, universe) -> bool:
-    text = query.lower()
-    matched = {label for label, pat in _MULTI_INTENT_PATTERNS if re.search(pat, text)}
-    return len(matched) >= 2
+    """Multi-intent = >=2 klausa terpisah pemisah jelas, masing-masing punya
+    kata kunci intent kuat, dengan >=2 kategori BERBEDA. Satu kalimat dengan
+    dua kata kunci (misal "analisa kondisi breakout BCA") = SATU maksud.
+    """
+    clauses = [c for c in re.split(_CLAUSE_SEPARATORS, query.lower()) if c.strip()]
+    if len(clauses) < 2:
+        return False
+    all_intents: set[str] = set()
+    for clause in clauses:
+        matched = {label for label, pat in _MULTI_INTENT_PATTERNS if re.search(pat, clause)}
+        all_intents |= matched
+    return len(all_intents) >= 2
+
+
+def _name_tokens(name: str) -> set[str]:
+    """Token kata utuh (>=3 huruf, non-alpha dibuang) dari nama perusahaan."""
+    tokens = set()
+    for raw in name.lower().split():
+        token = re.sub(r"[^a-z]", "", raw)
+        if len(token) >= 3:
+            tokens.add(token)
+    return tokens
 
 
 def detect_company_candidates(word: str, universe) -> list[str]:
-    """Kandidat ticker dari nama perusahaan yang mengandung `word`. [] kalau tak cocok."""
-    if not word or universe is None:
+    """Kandidat ticker: `word` (>=3 huruf) harus TOKEN UTUH di nama perusahaan,
+    bukan substring — "sari" tidak cocok ke "Indosari". [] kalau tak cocok."""
+    if not word or universe is None or len(word) < 3:
         return []
-    return [s["ticker"] for s in universe if word.lower() in s["name"].lower()][:5]
+    w = word.lower()
+    out = []
+    for s in universe:
+        if w in _name_tokens(s["name"]):
+            out.append(s["ticker"])
+    return out[:5]
 
 
 def detect_ambiguity(query: str, intent: str, params: dict, universe) -> AmbiguityResult:
@@ -87,13 +117,21 @@ def detect_ambiguity(query: str, intent: str, params: dict, universe) -> Ambigui
         return AmbiguityResult(True, "multi_intent", [])
     invalid = detect_invalid_ticker(intent, params, universe)
     if invalid:
-        candidates = []
+        # Regex parser bisa memotong kata panjang ("telekomunikasi" -> "tele").
+        # Expand ke kata UTUH di query supaya kandidat & substitusi benar.
+        words = re.findall(r"[a-z]{3,}", query.lower())
+        full_words = []
         for t in invalid:
-            candidates.extend(detect_company_candidates(t, universe))
-        return AmbiguityResult(True, "invalid_ticker", candidates[:5])
+            full = next((w for w in words if t.lower() in w), t.lower())
+            if full not in full_words:
+                full_words.append(full)
+        candidates = []
+        for w in full_words:
+            candidates.extend(detect_company_candidates(w, universe))
+        return AmbiguityResult(True, "invalid_ticker", candidates[:5], full_words)
     if intent == "unknown":
         for word in re.findall(r"[a-z]{2,}", query.lower()):
             candidates = detect_company_candidates(word, universe)
             if candidates:
-                return AmbiguityResult(True, "company_candidate", candidates)
+                return AmbiguityResult(True, "company_candidate", candidates, [word])
     return AmbiguityResult()

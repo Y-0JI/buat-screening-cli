@@ -1,3 +1,4 @@
+import re
 import sys
 import typer
 from app.config.settings import settings
@@ -121,8 +122,13 @@ def compare(
     ticker1: str = typer.Argument(help="Ticker pertama (atau dua ticker pisah koma)"),
     ticker2: str = typer.Argument("", help="Ticker kedua (opsional)"),
 ) -> None:
-    tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
-    tickers = [normalize(t) for t in tickers_str.replace(",", " ").split()]
+    _run_compare(f"{ticker1},{ticker2}" if ticker2 else ticker1)
+
+
+def _run_compare(tickers_str: str) -> None:
+    """Logika compare — dipakai command compare() dan natural() (typer-command
+    tidak bisa dipanggil manual: parameter dengan default jadi ArgumentInfo)."""
+    tickers = [normalize(t) for t in tickers_str.replace(",", " ").split() if t]
     for t in tickers:
         err = validate_symbol(t)
         if err:
@@ -141,6 +147,10 @@ def screen(
     sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
+    _run_screen(sector, limit)
+
+
+def _run_screen(sector: Optional[str], limit: int = 10) -> None:
     _warn_universe_age()
     symbols = get_discovered_tickers()
     if sector:
@@ -222,17 +232,17 @@ def natural(query: str) -> None:
         resolved = _resolve_ambiguity_flow(result)
         if resolved is None:
             return
-        natural(f"analisa {resolved}")
+        natural(_substitute_ticker(query, result.ambiguity.invalid, resolved))
         return
     intent, params = result.intent, result.params
     if intent == "analyze":
         analyze(params.get("ticker", ""))
     elif intent == "compare":
         tk = params.get("tickers", "")
-        compare(tk)
+        _run_compare(tk)
     elif intent == "screen":
         sector_filter = params.get("sector")
-        screen(sector=sector_filter)
+        _run_screen(sector_filter)
     elif intent == "research":
         research(params.get("text", query))
     elif intent == "help":
@@ -273,8 +283,8 @@ def _resolve_ambiguity_flow(result) -> str | None:
     if a.reason == "multi_intent":
         _p.info("Query kamu ambigu (beberapa maksud terdeteksi). Pisah jadi perintah terpisah, contoh: 'bandingkan A dan B' lalu 'riset sektor X'.")
         return None
-    if a.reason == "invalid_ticker" and not a.candidates:
-        _p.info("Ticker di query tidak dikenal. Periksa kode saham atau jalankan 'stocks <nama>' untuk mencari.")
+    if a.reason == "invalid_ticker" and (not a.candidates or len(a.invalid) > 1):
+        _p.info(f"Ticker tidak dikenal: {', '.join(a.invalid)}. Periksa kode saham atau jalankan 'stocks <nama>' untuk mencari.")
         return None
     if not a.candidates:
         _p.info("Query kamu ambigu. Coba ulangi dengan maksud yang lebih jelas.")
@@ -285,6 +295,16 @@ def _resolve_ambiguity_flow(result) -> str | None:
     return choice
 
 
+def _substitute_ticker(query: str, tokens: list[str], chosen: str) -> str:
+    """Ganti kata yang tidak dikenal di query ASLI dengan pilihan user (word-boundary,
+    case-insensitive) — mempertahankan struktur dan maksud permintaan asli,
+    bukan membuat query baru yang membuang intent."""
+    out = query
+    for tok in tokens:
+        out = re.sub(rf"\b{re.escape(tok)}\b", chosen, out, flags=re.IGNORECASE)
+    return out
+
+
 @app.command()
 def research(query: str) -> None:
     result = parse_full(query, get_all())
@@ -292,7 +312,7 @@ def research(query: str) -> None:
         resolved = _resolve_ambiguity_flow(result)
         if resolved is None:
             return
-        query = f"analisa {resolved}"
+        query = _substitute_ticker(query, result.ambiguity.invalid, resolved)
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
         report = run_research(query)
     if report.intent.type == "unsupported":

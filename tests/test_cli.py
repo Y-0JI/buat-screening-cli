@@ -180,6 +180,39 @@ def test_resolve_ambiguity_menu():
     assert _resolve_ambiguity([]) is None
 
 
+def test_substitute_ticker_keeps_query_structure():
+    from app.cli.main import _substitute_ticker
+    assert _substitute_ticker("bandingkan bca dan telekomunikasi", ["telekomunikasi"], "MTEL") == "bandingkan bca dan MTEL"
+    assert _substitute_ticker("Analisa Telekomunikasi", ["telekomunikasi"], "MTEL") == "Analisa MTEL", "case-insensitive"
+    assert _substitute_ticker("bandingkan bca dan xyz", ["xyz"], "BBRI") == "bandingkan bca dan BBRI"
+    assert _substitute_ticker("bandingkan bca dan xyz", ["abc"], "BBRI") == "bandingkan bca dan xyz", "token tak ada = no-op"
+
+
+@patch("app.agent.core.chat_completion", return_value="Perbandingan: BBCA vs MTEL")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_natural_ambiguity_compare_keeps_intent(mock_fetch, mock_llm):
+    with patch("app.cli.main._resolve_ambiguity_flow", return_value="MTEL"), patch("app.cli.main.get_all", return_value=[
+        {"ticker": "BBCA", "name": "Bank Central Asia Tbk."},
+        {"ticker": "MTEL", "name": "Mitra Telekomunikasi Indonesia Tbk."},
+    ]):
+        result = runner.invoke(app, ["natural", "bandingkan bca dan telekomunikasi"])
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    assert "BCA" in called and "MTEL" in called, "maksud compare harus dipertahankan, bukan analyze tunggal"
+
+
+@patch("app.agent.research.chat_completion")
+@patch("app.agent.core.chat_completion")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_research_ambiguity_compare_keeps_intent(mock_fetch, mock_llm_core, mock_llm_research):
+    with patch("app.cli.main._resolve_ambiguity_flow", return_value="MTEL"), patch("app.cli.main.get_all", return_value=[
+        {"ticker": "BBCA", "name": "Bank Central Asia Tbk."},
+        {"ticker": "MTEL", "name": "Mitra Telekomunikasi Indonesia Tbk."},
+    ]):
+        result = runner.invoke(app, ["research", "bandingkan bca dan telekomunikasi"])
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    assert "BCA" in called and "MTEL" in called, "riset comparative harus dipertahankan, bukan analyze tunggal"
+
+
 def test_analyze_invalid_ticker():
     result = runner.invoke(app, ["analyze", "ABCDEFGHIJK"])
     assert result.exit_code != 0
