@@ -590,6 +590,19 @@ def test_extract_sections_no_false_positive():
     assert s["recommendations"] == ["hold"]
 
 
+def test_extract_sections_ignores_unknown_headers():
+    from app.agent.research import _extract_sections
+    text = (
+        "## Ringkasan Eksekutif\nBBCA kuat.\n"
+        "## Company Overview\nPT Bank ini punya teks ngelantur panjang.\n"
+        "## Technical Analysis\nRSI 80 overbought, MACD bullish.\n"
+        "## Rekomendasi\n1. hold"
+    )
+    s = _extract_sections(text)
+    assert s["summary"] == "BBCA kuat.", "teks di bawah header asing harus didrop, bukan numpuk ke summary"
+    assert s["recommendations"] == ["hold"]
+
+
 def test_trim_analysis_keeps_head_and_tail():
     from app.agent.research import _trim_analysis
     long = "A" * 400 + "B" * 1000 + "C" * 400
@@ -638,3 +651,32 @@ def test_presenter_renders_section_data_when_ai_failed():
     assert "Data Terkini" in out, "fallback data harus dirender saat AI gagal"
     assert "trailingPE=21.24" in out, "nilai fundamental harus tampil di fallback"
     assert "der=" in out and "roe=" in out, "rasio turunan harus ikut di fallback"
+
+
+def test_presenter_renders_section_tables():
+    from io import StringIO
+    from types import SimpleNamespace
+    from rich.console import Console
+    from app.presenters.rich_presenter import RichPresenter
+
+    rd = _rd_with_data(fundamentals={"trailingPE": 21.24, "beta": 1.1}, raw_fin=_ADRO_RAW)
+    report = SimpleNamespace(
+        intent=SimpleNamespace(raw_query="riset BBCA", type="single_stock"),
+        research_data=rd,
+        failed=[],
+        ai_failed=False,
+        executive_summary="BBCA layak beli.",
+        screening_results=None,
+        analyses=None,
+        comparison=None,
+        recommendations=["1. hold"],
+    )
+    buf = StringIO()
+    with patch("app.presenters.rich_presenter.console", Console(file=buf, width=120)):
+        RichPresenter().research_report(report)
+    out = buf.getvalue()
+    assert "Ringkasan Eksekutif" in out, "panel ringkasan harus tetap ada"
+    assert "Fundamental Analysis" in out, "section AVAILABLE harus dirender sebagai tabel"
+    assert "Financial Analysis" in out
+    assert "trailingPE" in out, "nilai fundamental harus tampil di tabel section"
+    assert "BBCA layak beli." in out, "isi ringkasan eksekutif tidak boleh hilang"

@@ -3,6 +3,8 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
 
+from app.models.research import REPORT_SECTION_LABELS, SectionStatus
+
 
 console = Console()
 
@@ -65,6 +67,13 @@ class RichPresenter:
             console.print()
 
         if rd:
+            for key in ("fundamental", "financial", "valuation", "growth", "dividend", "technical", "risk"):
+                sec = rd.sections.get(key)
+                if not sec or sec.status == SectionStatus.MISSING or not sec.data:
+                    continue
+                self._section_table(REPORT_SECTION_LABELS.get(key, key.replace("_", " ")), sec.data)
+
+        if rd:
             missing = [s for s in rd.sections.items() if s[1].status.value == "missing"]
             if missing:
                 labels = [f"{k.replace('_', ' ')} ({s.reason})" if s.reason else k.replace("_", " ") for k, s in missing]
@@ -114,6 +123,25 @@ class RichPresenter:
                     lines.append(f"{label}: " + ", ".join(f"{k} ({r})" if r else k for k, r in items.items()))
             console.print()
             console.print(Panel("\n".join(lines), title="[bold]Confidence (kelengkapan data)[/bold]", border_style="magenta"))
+
+    def _section_table(self, title: str, data: dict) -> None:
+        from app.agent.research import _fmt_num
+        table = Table(title=title)
+        table.add_column("Label", style="cyan")
+        table.add_column("Nilai", style="white")
+        for ticker, metrics in data.items():
+            items = metrics.items() if isinstance(metrics, dict) else ((ticker, metrics),)
+            prefix = f"{ticker}." if isinstance(metrics, dict) and len(data) > 1 else ""
+            for k, v in items:
+                if isinstance(v, dict):
+                    parts = ", ".join(f"{sk}={_fmt_num(sv)}" for sk, sv in v.items() if sv is not None)
+                    table.add_row(f"{prefix}{k}", parts)
+                elif isinstance(v, list):
+                    table.add_row(f"{prefix}{k}", "; ".join(str(x) for x in v))
+                else:
+                    table.add_row(f"{prefix}{k}", _fmt_num(v))
+        console.print(table)
+        console.print()
 
     def error(self, message: str) -> None:
         console.print(f"[bold red]Error:[/bold red] {message}")
