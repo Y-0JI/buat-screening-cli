@@ -15,6 +15,11 @@ INTENT_HELP = "help"
 INTENT_RESEARCH = "research"
 INTENT_UNKNOWN = "unknown"
 
+# Verb analisa eksplisit + satu kata (2-5 huruf) di ujung kalimat — pola utama
+# analyze. Dipakai pre-screen (analyze menang atas screen saat verb jelas)
+# dan di loop analyze_patterns.
+_ANALYZE_ANCHOR_PATTERN = r"(?:analisa|analisis|analisislah|cek|lihat|periksa|bagaimana|kondisi|review|berita|fundamental|teknikal|lengkap)\s+.*?\b(\w{2,5})\W*$"
+
 
 @dataclass
 class ParseResult:
@@ -162,6 +167,12 @@ def _parse(text: str) -> tuple[str, dict]:
     if re.search(r"\b(?:riset|research|penelitian|studi)\b", text_lower):
         return INTENT_RESEARCH, {"text": text}
 
+    anchor = re.search(_ANALYZE_ANCHOR_PATTERN, text_lower)
+    if anchor:
+        ticker = normalize(anchor.group(1))
+        if len(ticker) <= 5 and ticker.isalpha():
+            return INTENT_ANALYZE, {"ticker": ticker}
+
     if re.search(r"breakout|golden\s*cross|screening|saham\s+apa|rekomendasi|cari\s+saham", text_lower):
         return INTENT_SCREEN, {"type": "all"}
 
@@ -173,7 +184,7 @@ def _parse(text: str) -> tuple[str, dict]:
         return INTENT_STOCKS, {}
 
     analyze_patterns = [
-        r"(?:analisa|analisis|analisislah|cek|lihat|periksa|bagaimana|kondisi|review|berita|fundamental|teknikal|lengkap)\s+.*?\b(\w{2,5})\W*$",
+        _ANALYZE_ANCHOR_PATTERN,
         r"apakah\s+(\w+)\s+layak",
         r"bagaimana\s+(?:dengan\s+)?(\w+)",
         r"^(?:saham\s+)?(\w{2,5})$",

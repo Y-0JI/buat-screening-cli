@@ -60,6 +60,24 @@ class TestParse:
             assert intent == INTENT_ANALYZE, q
             assert params["ticker"] == ticker, q
 
+    def test_analyze_wins_over_screen_with_explicit_verb(self):
+        cases = [
+            "analisa kondisi breakout BCA",
+            "cari saham breakout dan analisa bca",
+            "bagaimana kondisi breakout bca",
+            "cek breakout bca",
+        ]
+        for q in cases:
+            intent, params = parse(q)
+            assert intent == INTENT_ANALYZE, q
+            assert params["ticker"] == "BCA", q
+
+    def test_screen_without_verb_unchanged(self):
+        for q in ("cari saham breakout", "screening", "rekomendasi saham"):
+            intent, params = parse(q)
+            assert intent == INTENT_SCREEN, q
+            assert params == {"type": "all"}, q
+
     def test_gainers_new_variant(self):
         intent, params = parse("saham apa yang naik terus")
         assert intent == INTENT_GAINERS
