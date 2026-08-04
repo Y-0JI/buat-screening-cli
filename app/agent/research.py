@@ -5,6 +5,7 @@ from app.router.engine import fetch_stock, bulk_screen, build_context
 from app.services.llm import chat_completion
 from app.services.stock_list import get_all
 from app.parser.intent import detect_research_intent, ResearchIntent
+from app.tools.news import fetch_news
 from app.memory import get_store
 from app.memory.models import MemoryType
 from app.models.analysis import AIAnalysis
@@ -97,7 +98,9 @@ def _merge_missing(dst: dict, src: dict) -> dict:
 
 def enrich_market_intelligence(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
     """Market Intelligence container: market context (real data only), analyst sentiment,
-    technical context (numbers only), news availability. Deterministic."""
+    technical context (numbers only), news headlines (Google News RSS) + availability.
+    Section built once — data per ticker, never overwritten."""
+    slots: dict[str, dict] = {}
     for ticker, a in (analyses or {}).items():
         if not (a.raw_data and a.raw_data.history):
             continue
@@ -127,15 +130,30 @@ def enrich_market_intelligence(rd: ResearchData, analyses: dict[str, AIAnalysis]
         if tech:
             slot["technical_context"] = tech
 
-        slot["news_availability"] = {"status": "unavailable", "reason": REASON_NEWS_UNAVAILABLE}
+        news = fetch_news(info.name)
+        if news:
+            slot["news"] = [
+                {"title": n["title"], "link": n["link"], "published": n["published"], "source": n["source"], "tag": None}
+                for n in news
+            ]
+            slot["news_availability"] = {"status": "available"}
+        else:
+            slot["news_availability"] = {"status": "unavailable", "reason": REASON_NEWS_UNAVAILABLE}
 
-        if slot:
-            rd.sections["market_intelligence"] = ResearchSection(
-                source="yfinance.info; derived(price_history)",
-                status=SectionStatus.PARTIAL,
-                reason=REASON_NEWS_UNAVAILABLE,
-                data={ticker: slot},
-            )
+        slots[ticker] = slot
+
+    if not slots:
+        return
+    has_news = any(s["news_availability"].get("status") == "available" for s in slots.values())
+    source = "yfinance.info; derived(price_history)"
+    if has_news:
+        source += "; news(google_rss)"
+    rd.sections["market_intelligence"] = ResearchSection(
+        source=source,
+        status=SectionStatus.AVAILABLE if has_news else SectionStatus.PARTIAL,
+        reason="" if has_news else REASON_NEWS_UNAVAILABLE,
+        data=slots,
+    )
 
 
 def enrich_research_data(rd: ResearchData, analyses: dict[str, AIAnalysis] | None) -> None:
@@ -339,6 +357,10 @@ def run_research(query: str) -> ResearchReport:
         sections = _extract_sections(llm_result)
         executive_summary = sections["summary"]
         recommendations = sections["recommendations"]
+        if research_data:
+            mi = research_data.sections["market_intelligence"]
+            for slot in mi.data.values():
+                _apply_news_tags(slot, sections.get("news", []))
     else:
         ai_failed = True
 
@@ -371,6 +393,7 @@ def run_research(query: str) -> ResearchReport:
 
 _SUMMARY_LABELS = ("ringkasan eksekutif", "ringkasan", "eksekutif", "kesimpulan", "rangkuman", "conclusion", "summary")
 _RECS_LABELS = ("rekomendasi", "recommendation", "recommendations")
+_NEWS_LABELS = ("sentimen berita", "tag berita", "berita", "news sentiment")
 _KNOWN_SECTION_LABELS = {label.lower() for label in REPORT_SECTION_LABELS.values()}
 
 
@@ -380,7 +403,7 @@ def _normalize_line(line: str) -> str:
 
 def _match_section(line: str) -> tuple[str, str] | None:
     norm = _normalize_line(line)
-    for section, labels in (("summary", _SUMMARY_LABELS), ("recs", _RECS_LABELS)):
+    for section, labels in (("summary", _SUMMARY_LABELS), ("recs", _RECS_LABELS), ("news", _NEWS_LABELS)):
         for label in labels:
             if norm == label:
                 return section, ""
@@ -392,9 +415,10 @@ def _match_section(line: str) -> tuple[str, str] | None:
     return None
 
 
-def _extract_sections(text: str) -> dict[str, str | list[str]]:
+def _extract_sections(text: str) -> dict[str, object]:
     summary_parts = []
     recommendations = []
+    news_parts = []
     current = None
     for raw in text.split("\n"):
         line = raw.strip()
@@ -406,14 +430,42 @@ def _extract_sections(text: str) -> dict[str, str | list[str]]:
             if inline:
                 if current == "summary":
                     summary_parts.append(inline)
-                else:
+                elif current == "recs":
                     recommendations.append(inline.lstrip("-•*123456789. "))
+                else:
+                    _parse_news_line(news_parts, inline)
             continue
         if current == "summary":
             summary_parts.append(line)
         elif current == "recs" and line.startswith(("-", "•", "1.", "2.", "3.", "4.", "5.")):
             recommendations.append(line.lstrip("-•*123456789. "))
-    return {"summary": " ".join(summary_parts).strip(), "recommendations": recommendations}
+        elif current == "news":
+            _parse_news_line(news_parts, line)
+    return {"summary": " ".join(summary_parts).strip(), "recommendations": recommendations, "news": news_parts}
+
+
+def _parse_news_line(news_parts: list[dict], line: str) -> None:
+    norm = line.lstrip("-•*123456789. ").strip()
+    if ":" not in norm:
+        return
+    title, tag = norm.rsplit(":", 1)
+    news_parts.append({"title": title.strip(), "tag": tag.strip() or None})
+
+
+def _apply_news_tags(slot: dict, news_parts: list[dict]) -> None:
+    """Title-text matching: tag AI ke headline asli. Reorder/skip aman; unmatched -> None."""
+    headlines = slot.get("news") or []
+    used = set()
+    for part in news_parts:
+        ai_title = (part.get("title") or "").strip().lower()
+        for i, h in enumerate(headlines):
+            if i in used:
+                continue
+            h_title = (h.get("title") or "").strip().lower()
+            if ai_title and (ai_title in h_title or h_title in ai_title):
+                h["tag"] = part.get("tag") or None
+                used.add(i)
+                break
 
 
 def _trim_analysis(text: str, limit: int = 800) -> str:
@@ -524,7 +576,11 @@ def _serialize_market_intelligence(data: dict) -> list[str]:
             if bits:
                 parts.append("teknikal: " + ", ".join(bits))
         news = slot.get("news_availability", {})
-        if news.get("status") == "unavailable":
+        if news.get("status") == "available":
+            for n in slot.get("news", []):
+                src = n.get("source", "")
+                parts.append(f"berita: {n['title']}" + (f" ({src})" if src else ""))
+        elif news.get("status") == "unavailable":
             parts.append(f"berita: tidak tersedia ({news.get('reason', '')})")
         if parts:
             lines.append(f"- {ticker}: " + "; ".join(parts))
