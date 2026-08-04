@@ -147,6 +147,39 @@ def test_natural_unknown():
     assert result.exit_code == 0
 
 
+@patch.object(engine.provider, "fetch")
+def test_natural_ambiguity_no_fetch(mock_fetch):
+    with patch("app.cli.main.get_all", return_value=[
+        {"ticker": "BBCA", "name": "Bank Central Asia Tbk."},
+        {"ticker": "BBRI", "name": "Bank Rakyat Indonesia Tbk."},
+    ]):
+        result = runner.invoke(app, ["natural", "bandingkan xyz dan abc"])
+    assert result.exit_code == 0, "ambigu harus batal dengan pesan, bukan error"
+    mock_fetch.assert_not_called(), "ambigu tidak boleh memicu fetch"
+
+
+@patch.object(engine.provider, "fetch")
+def test_research_ambiguity_no_fetch(mock_fetch):
+    with patch("app.cli.main.get_all", return_value=[
+        {"ticker": "BBCA", "name": "Bank Central Asia Tbk."},
+        {"ticker": "BBRI", "name": "Bank Rakyat Indonesia Tbk."},
+    ]):
+        result = runner.invoke(app, ["research", "bandingkan xyz dan abc"])
+    assert result.exit_code == 0
+    mock_fetch.assert_not_called()
+
+
+def test_resolve_ambiguity_menu():
+    from app.cli.main import _resolve_ambiguity
+    with patch("sys.stdin.isatty", return_value=True), patch("app.cli.main.console.input", return_value="2"):
+        assert _resolve_ambiguity(["BBCA", "BBRI", "BMRI"]) == "BBRI"
+    with patch("sys.stdin.isatty", return_value=True), patch("app.cli.main.console.input", return_value="9"):
+        assert _resolve_ambiguity(["BBCA"]) is None, "nomor di luar rentang = batal"
+    with patch("sys.stdin.isatty", return_value=False):
+        assert _resolve_ambiguity(["BBCA"]) is None, "non-TTY tidak boleh prompt"
+    assert _resolve_ambiguity([]) is None
+
+
 def test_analyze_invalid_ticker():
     result = runner.invoke(app, ["analyze", "ABCDEFGHIJK"])
     assert result.exit_code != 0
@@ -174,11 +207,13 @@ def _mock_fetch_partial_fail(ticker, *args, **kwargs):
 @patch("app.agent.research.chat_completion")
 @patch("app.agent.core.chat_completion")
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-def test_research_single_stock_failure_exits_nonzero_no_ai(mock_fetch, mock_llm_core, mock_llm_research):
+def test_research_invalid_ticker_ambiguity_no_ai(mock_fetch, mock_llm_core, mock_llm_research):
+    """Ticker tidak dikenal di universe -> ambigu, batal dengan pesan, tanpa fetch/LLM."""
     result = runner.invoke(app, ["research", "analisa XYZY"])
-    assert result.exit_code != 0
+    assert result.exit_code == 0
     mock_llm_core.assert_not_called()
     mock_llm_research.assert_not_called()
+    mock_fetch.assert_not_called()
 
 
 @patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")

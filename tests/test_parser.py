@@ -1,4 +1,4 @@
-from app.parser.intent import parse, detect_research_intent, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN, INTENT_GAINERS, INTENT_LOSERS, INTENT_STOCKS
+from app.parser.intent import parse, parse_full, detect_research_intent, INTENT_ANALYZE, INTENT_SCREEN, INTENT_COMPARE, INTENT_HELP, INTENT_UNKNOWN, INTENT_GAINERS, INTENT_LOSERS, INTENT_STOCKS
 
 
 class TestParse:
@@ -46,6 +46,34 @@ class TestParse:
         assert intent == INTENT_ANALYZE
         assert params["ticker"] == "TLKM"
 
+    def test_analyze_new_expressions(self):
+        cases = [
+            ("kenapa bca turun", "BCA"),
+            ("bca bagus nggak", "BCA"),
+            ("kelayakan bca", "BCA"),
+            ("mau beli bca", "BCA"),
+            ("nasib bca", "BCA"),
+            ("berita bca", "BCA"),
+        ]
+        for q, ticker in cases:
+            intent, params = parse(q)
+            assert intent == INTENT_ANALYZE, q
+            assert params["ticker"] == ticker, q
+
+    def test_gainers_new_variant(self):
+        intent, params = parse("saham apa yang naik terus")
+        assert intent == INTENT_GAINERS
+
+    def test_compare_lebih_baik(self):
+        intent, params = parse("mana yang lebih baik bca atau bri")
+        assert intent == INTENT_COMPARE
+        assert params["tickers"] == "BCA,BRI"
+
+    def test_saham_sector_fallback(self):
+        intent, params = parse("saham energi")
+        assert intent == INTENT_SCREEN
+        assert params == {"type": "sector", "sector": "energi"}
+
     def test_compare(self):
         intent, params = parse("Bandingkan BBCA dan BBRI")
         assert intent == INTENT_COMPARE
@@ -84,6 +112,41 @@ class TestParse:
     def test_unknown(self):
         intent, params = parse("lalala")
         assert intent == INTENT_UNKNOWN
+
+
+class TestParseFull:
+    _U = [
+        {"ticker": "BBCA", "name": "Bank Central Asia Tbk."},
+        {"ticker": "BBRI", "name": "Bank Rakyat Indonesia Tbk."},
+        {"ticker": "TLKM", "name": "Telkom Indonesia (Persero) Tbk."},
+        {"ticker": "MTEL", "name": "Mitra Telekomunikasi Indonesia Tbk."},
+    ]
+
+    def test_backward_compat_parse_tuple(self):
+        result = parse_full("analisa BBCA", self._U)
+        assert parse("analisa BBCA") == (result.intent, result.params)
+
+    def test_confidence_levels(self):
+        assert parse_full("analisa BBCA", self._U).confidence == "high"
+        assert parse_full("analisa BBCA").confidence == "medium", "tanpa universe tidak bisa high"
+        assert parse_full("BBCA", self._U).confidence == "low", "single-word fallback = low"
+        assert parse_full("lalala", self._U).confidence == "low"
+        assert parse_full("saham apa", self._U).confidence == "medium"
+
+    def test_ambiguous_result(self):
+        r = parse_full("analisa xyz", self._U)
+        assert r.ambiguity.ambiguous is True
+        assert r.confidence == "low"
+        r2 = parse_full("analisa BBCA", self._U)
+        assert r2.ambiguity.ambiguous is False
+
+    def test_saham_sector_reinterpret_with_universe(self):
+        r = parse_full("saham BBCA", self._U)
+        assert r.intent == INTENT_ANALYZE, "ticker valid di universe tetap analyze"
+        assert r.params == {"ticker": "BBCA"}
+        r2 = parse_full("saham energi", self._U)
+        assert r2.intent == INTENT_SCREEN
+        assert r2.params == {"type": "sector", "sector": "energi"}
 
 
 class TestDetectResearchIntent:
