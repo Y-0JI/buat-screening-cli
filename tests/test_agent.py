@@ -471,6 +471,72 @@ def test_market_intelligence_container_single_stock():
     assert "bullish" not in str(slot["technical_context"]).lower(), "interpretasi bukan bagian kontrak"
 
 
+def test_market_intelligence_news_fills_slot():
+    from app.agent.research import build_research_data, enrich_market_intelligence
+    from app.models.research import SectionStatus
+    from app.parser.intent import ResearchIntent
+    a = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={}, raw_data=_mock_stock_data(), screening_results=None)
+    a.raw_data.info.fundamentals = {"recommendationKey": "buy"}
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, None, {})
+    news = [
+        {"title": "Laba BBCA naik", "link": "https://x/1", "published": "Tue, 04 Aug 2026 05:00:00 GMT", "source": "Media", "tag": None},
+        {"title": "BBCA ekspansi", "link": "https://x/2", "published": "Mon, 03 Aug 2026 10:00:00 GMT", "source": "Kompas", "tag": None},
+    ]
+    with patch("app.agent.research.fetch_news", return_value=news):
+        enrich_market_intelligence(rd, {"BBCA": a})
+    mi = rd.sections["market_intelligence"]
+    assert mi.status == SectionStatus.AVAILABLE
+    assert mi.reason == ""
+    slot = mi.data["BBCA"]
+    assert slot["news_availability"] == {"status": "available"}
+    assert [n["title"] for n in slot["news"]] == ["Laba BBCA naik", "BBCA ekspansi"]
+    assert all(n["tag"] is None for n in slot["news"]), "tag diisi LLM, bukan enrichment"
+
+
+def test_market_intelligence_keeps_all_tickers():
+    from app.agent.research import build_research_data, enrich_market_intelligence
+    from app.models.research import SectionStatus
+    from app.parser.intent import ResearchIntent
+    a1 = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={}, raw_data=_mock_stock_data(), screening_results=None)
+    a2 = AIAnalysis(ticker="BBRI", summary="ok", key_metrics={}, raw_data=_mock_stock_data(), screening_results=None)
+    a2.raw_data.info = a2.raw_data.info.model_copy(update={"name": "Bank Rakyat Indonesia"})
+    rd = build_research_data(ResearchIntent("comparative", ["BBCA", "BBRI"], None, "q"), None, {"BBCA": a1, "BBRI": a2}, None, {})
+    with patch("app.agent.research.fetch_news", side_effect=lambda name: [
+        {"title": f"berita {name}", "link": f"https://x/{name}", "published": "", "source": "M", "tag": None}
+    ]):
+        enrich_market_intelligence(rd, {"BBCA": a1, "BBRI": a2})
+    mi = rd.sections["market_intelligence"]
+    assert set(mi.data) == {"BBCA", "BBRI"}, "dua ticker harus tersimpan, bukan cuma yang terakhir di-iterasi"
+    assert mi.data["BBCA"]["news"][0]["title"] == "berita Test Bank"
+    assert mi.data["BBRI"]["news"][0]["title"] == "berita Bank Rakyat Indonesia"
+    assert mi.status == SectionStatus.AVAILABLE
+
+
+def test_extract_sections_news_tags():
+    from app.agent.research import _extract_sections
+    text = "## Ringkasan Eksekutif\nOk.\n## Sentimen Berita\n- Laba BBCA naik : positif\n- BBCA ekspansi : netral\n## Rekomendasi\n1. hold"
+    s = _extract_sections(text)
+    assert s["summary"] == "Ok."
+    assert s["news"] == [{"title": "Laba BBCA naik", "tag": "positif"}, {"title": "BBCA ekspansi", "tag": "netral"}]
+    assert s["recommendations"] == ["hold"]
+
+
+def test_apply_news_tags_title_text_match():
+    from app.agent.research import _apply_news_tags
+    slot = {"news": [
+        {"title": "Laba BBCA Naik 25%", "link": "x", "published": "", "source": "", "tag": None},
+        {"title": "BBCA Ekspansi ke Vietnam", "link": "y", "published": "", "source": "", "tag": None},
+        {"title": "Dividen BBCA", "link": "z", "published": "", "source": "", "tag": None},
+    ]}
+    parts = [
+        {"title": "BBCA Ekspansi ke Vietnam", "tag": "netral"},
+        {"title": "Laba BBCA Naik", "tag": "positif"},
+        {"title": "Berita Entah", "tag": "negatif"},
+    ]
+    _apply_news_tags(slot, parts)
+    assert [n["tag"] for n in slot["news"]] == ["positif", "netral", None], "match by title-text, unmatched -> None"
+
+
 def test_market_context_only_from_real_market_data():
     from app.agent.research import build_research_data, enrich_market_intelligence
     from app.parser.intent import ResearchIntent

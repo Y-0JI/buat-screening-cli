@@ -72,6 +72,7 @@ class RichPresenter:
                 if not sec or sec.status == SectionStatus.MISSING or not sec.data:
                     continue
                 self._section_table(REPORT_SECTION_LABELS.get(key, key.replace("_", " ")), sec.data)
+            self._market_intelligence_panel(rd)
 
         if rd:
             missing = [s for s in rd.sections.items() if s[1].status.value == "missing"]
@@ -123,6 +124,29 @@ class RichPresenter:
                     lines.append(f"{label}: " + ", ".join(f"{k} ({r})" if r else k for k, r in items.items()))
             console.print()
             console.print(Panel("\n".join(lines), title="[bold]Confidence (kelengkapan data)[/bold]", border_style="magenta"))
+
+    def _market_intelligence_panel(self, rd) -> None:
+        mi = rd.sections.get("market_intelligence")
+        if not mi or mi.status != SectionStatus.AVAILABLE:
+            return
+        lines = []
+        for slot in mi.data.values():
+            for n in slot.get("news") or []:
+                tag = n.get("tag")
+                title = f"[link={n.get('link', '')}]{n['title']}[/link]"
+                if tag in ("positif", "pos", "positive"):
+                    tag_txt = "[green]positif[/green]"
+                elif tag in ("negatif", "neg", "negative"):
+                    tag_txt = "[red]negatif[/red]"
+                elif tag:
+                    tag_txt = f"[yellow]{tag}[/yellow]"
+                else:
+                    tag_txt = ""
+                published = " ".join((n.get("published") or "").split()[1:4])
+                lines.append(f"• {title}" + (f" — {tag_txt}" if tag_txt else "") + (f" [dim]({published})[/dim]" if published else ""))
+        if lines:
+            console.print(Panel("\n".join(lines), title="[bold]Market Intelligence[/bold]", border_style="blue"))
+            console.print()
 
     def _section_table(self, title: str, data: dict) -> None:
         from app.agent.research import _fmt_num
