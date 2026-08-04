@@ -32,7 +32,7 @@ def chat_completion(messages: list[dict], model: str | None = None, temperature:
         payload["temperature"] = temperature
 
     try:
-        with httpx.Client(timeout=30) as client:
+        with httpx.Client(timeout=120) as client:
             resp = client.post(url, headers=headers, json=payload)
             resp.raise_for_status()
             data = resp.json()

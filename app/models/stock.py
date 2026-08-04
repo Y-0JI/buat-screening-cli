@@ -1,5 +1,5 @@
 from datetime import date
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class HistoricalPrice(BaseModel):
@@ -20,6 +20,7 @@ class StockInfo(BaseModel):
     market: str | None = None
     market_cap: float | None = None
     currency: str = "IDR"
+    fundamentals: dict[str, float | str] = Field(default_factory=dict)
 
 
 class StockData(BaseModel):

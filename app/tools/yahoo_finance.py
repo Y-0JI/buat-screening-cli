@@ -1,3 +1,4 @@
+import json
 import logging
 import random
 import time
@@ -14,6 +15,32 @@ from app.tools.registry import ProviderRegistry
 # (bulk_screen ThreadPoolExecutor max_workers=2). Add a lock if workers increase.
 _last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
+
+# fundamental fields available in yfinance info, picked from Data Availability Audit
+_FUNDAMENTAL_FIELDS = (
+    "beta", "bookValue", "earningsGrowth", "earningsQuarterlyGrowth", "enterpriseToRevenue",
+    "epsCurrentYear", "epsForward", "epsTrailingTwelveMonths", "forwardEps", "forwardPE",
+    "grossMargins", "operatingMargins", "payoutRatio", "pegRatio", "priceEpsCurrentYear",
+    "priceToBook", "profitMargins", "recommendationKey", "recommendationMean",
+    "returnOnEquity", "revenueGrowth", "revenuePerShare", "targetHighPrice",
+    "targetLowPrice", "targetMeanPrice", "targetMedianPrice", "totalCash",
+    "totalCashPerShare", "totalDebt", "totalRevenue", "trailingAnnualDividendRate",
+    "trailingAnnualDividendYield", "trailingEps", "trailingPE", "trailingPegRatio",
+    "dividendRate", "dividendYield", "fiveYearAvgDividendYield",
+    "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "52WeekChange",
+)
+
+
+def _extract_fundamentals(info: dict) -> dict[str, float | str]:
+    out: dict[str, float | str] = {}
+    for key in _FUNDAMENTAL_FIELDS:
+        val = info.get(key)
+        if val is None:
+            continue
+        if isinstance(val, (int, float)) and val == 0.0:
+            continue  # yfinance fills some fields with 0.0 placeholder, not real data
+        out[key] = val
+    return out
 
 
 class YahooFinanceProvider(Provider):
@@ -39,6 +66,7 @@ class YahooFinanceProvider(Provider):
                         market=info.get("market"),
                         market_cap=info.get("marketCap"),
                         currency=info.get("currency", "IDR"),
+                        fundamentals=_extract_fundamentals(info),
                     )
                 else:
                     stock_info = StockInfo(ticker=ticker.upper(), name=ticker.upper())
@@ -77,6 +105,38 @@ class YahooFinanceProvider(Provider):
                 else:
                     logger.warning(f"Gagal fetch {ticker} setelah 3 percobaan: {e}")
                     return None
+
+    def fetch_financials(self, ticker: str) -> dict:
+        """Lazy: financial statements, only for full research reports.
+
+        Shares the same rate-limit cooldown and retry logic as fetch().
+        """
+        stock = yf.Ticker(ticker.upper() + ".JK")
+        cooldown = time.time() - _last_rate_limit[0]
+        if cooldown < 15:
+            time.sleep(15 - cooldown)
+        for attempt in range(3):
+            try:
+                out = {}
+                for name, attr in (("financials", stock.financials), ("balance_sheet", stock.balance_sheet), ("cashflow", stock.cashflow), ("dividends", stock.dividends)):
+                    if attr is not None and not attr.empty:
+                        out[name] = json.loads(attr.to_json(date_format="iso"))  # JSON-safe natively, dates stay readable
+                return out
+            except Exception as e:
+                kind = _classify_error(e)
+                if kind == "rate_limited":
+                    _last_rate_limit[0] = time.time()
+                    delay = random.uniform(10, 30)
+                    logger.warning(f"Rate limited financials {ticker}, cooling {delay:.0f}s (attempt {attempt+1}/3)")
+                    time.sleep(delay)
+                elif attempt < 2:
+                    delay = (1 + attempt) * random.uniform(0.5, 1.5)
+                    logger.debug(f"Retry financials {ticker} in {delay:.1f}s (attempt {attempt+1}/3): {e}")
+                    time.sleep(delay)
+                else:
+                    logger.warning(f"Gagal fetch financials {ticker} setelah 3 percobaan: {e}")
+                    return {}
+        return {}
 
     def get_price(self, ticker: str) -> float | None:
         if ticker.upper() in _invalid_tickers:

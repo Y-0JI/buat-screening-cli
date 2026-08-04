@@ -39,15 +39,42 @@ class RichPresenter:
         console.rule("[bold cyan]Laporan Riset End-to-End[/bold cyan]")
         console.print(f"[bold]Query:[/bold] {report.intent.raw_query}")
         console.print(f"[bold]Tipe Riset:[/bold] {report.intent.type}")
+        rd = report.research_data
+        if rd:
+            console.print(f"[bold]Simbol:[/bold] {rd.symbol}")
+            console.print(f"[bold]Waktu dibuat:[/bold] {rd.created_at.strftime('%Y-%m-%d %H:%M UTC')}")
         console.print()
 
         if report.failed:
             console.print(f"[yellow]⚠ Gagal memuat data: {', '.join(report.failed)}[/yellow]")
             console.print()
 
+        if report.ai_failed:
+            console.print("[yellow]⚠ AI tidak tersedia — laporan otomatis dari data terkini. ResearchData tetap tersimpan untuk regenerasi.[/yellow]")
+            console.print()
+
+        if rd and report.ai_failed:
+            from app.agent.research import serialize_research_data
+            fallback = [l for l in serialize_research_data(rd).splitlines() if l not in ("## Ringkasan Eksekutif", "## Rekomendasi")]
+            if fallback:
+                console.print(Panel("\n".join(fallback), title="[bold]Data Terkini (fallback tanpa AI)[/bold]", border_style="blue"))
+                console.print()
+
         if report.executive_summary:
             console.print(Panel(report.executive_summary, title="[bold]Ringkasan Eksekutif[/bold]", border_style="cyan"))
             console.print()
+
+        if rd:
+            missing = [s for s in rd.sections.items() if s[1].status.value == "missing"]
+            if missing:
+                labels = [f"{k.replace('_', ' ')} ({s.reason})" if s.reason else k.replace("_", " ") for k, s in missing]
+                console.print(f"[dim]Data tidak tersedia: {', '.join(labels)}[/dim]")
+                console.print()
+            partial = [s for s in rd.sections.items() if s[1].status.value == "partial"]
+            if partial:
+                labels = [f"{k.replace('_', ' ')} ({s.reason})" if s.reason else k.replace("_", " ") for k, s in partial]
+                console.print(f"[yellow]Data sebagian: {', '.join(labels)}[/yellow]")
+                console.print()
 
         if report.screening_results:
             table = Table(title="Hasil Screening")
@@ -77,6 +104,16 @@ class RichPresenter:
         if report.recommendations:
             rec_text = "\n".join(f"{i+1}. {r}" for i, r in enumerate(report.recommendations))
             console.print(Panel(rec_text, title="[bold green]Rekomendasi[/bold green]", border_style="green"))
+
+        if rd and rd.sections.get("investment_conclusion") and rd.sections["investment_conclusion"].data:
+            conf = rd.sections["investment_conclusion"].data.get("confidence", {})
+            lines = [f"Level: {conf.get('confidence_level', '?')} (skor {conf.get('confidence_score', '?')})"]
+            for label, key in (("Mengurangi", "missing_sections"), ("Sebagian", "partial_sections")):
+                items = conf.get(key) or {}
+                if items:
+                    lines.append(f"{label}: " + ", ".join(f"{k} ({r})" if r else k for k, r in items.items()))
+            console.print()
+            console.print(Panel("\n".join(lines), title="[bold]Confidence (kelengkapan data)[/bold]", border_style="magenta"))
 
     def error(self, message: str) -> None:
         console.print(f"[bold red]Error:[/bold red] {message}")
