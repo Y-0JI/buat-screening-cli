@@ -12,6 +12,31 @@ class TestParse:
         assert intent == INTENT_ANALYZE
         assert params["ticker"] == "BBCA"
 
+    def test_analyze_qualifier_fundamental(self):
+        intent, params = parse("analisa fundamental jkon")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "JKON"
+
+    def test_analyze_qualifier_teknikal(self):
+        intent, params = parse("analisa teknikal bbca")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "BBCA"
+
+    def test_analyze_qualifier_lengkap(self):
+        intent, params = parse("cek lengkap adro")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "ADRO"
+
+    def test_analyze_qualifier_leading(self):
+        intent, params = parse("fundamental bbni")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "BBNI"
+
+    def test_analyze_single_word_regression(self):
+        intent, params = parse("analisa jkon")
+        assert intent == INTENT_ANALYZE
+        assert params["ticker"] == "JKON"
+
     def test_compare(self):
         intent, params = parse("Bandingkan BBCA dan BBRI")
         assert intent == INTENT_COMPARE
@@ -56,6 +81,8 @@ class TestDetectResearchIntent:
     def test_consistency_with_parse(self):
         cases = [
             ("analisa BBCA", "single_stock", ["BBCA"], None),
+            ("analisa fundamental jkon", "single_stock", ["JKON"], None),
+            ("fundamental bbni", "single_stock", ["BBNI"], None),
             ("bandingkan BBCA dan BBRI", "comparative", ["BBCA", "BBRI"], None),
             ("BBCA vs BBRI", "comparative", ["BBCA", "BBRI"], None),
             ("cari saham breakout", "sector_theme", [], None),

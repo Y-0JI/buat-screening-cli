@@ -85,7 +85,7 @@ def parse(text: str) -> tuple[str, dict]:
         return INTENT_STOCKS, {}
 
     analyze_patterns = [
-        r"(?:analisa|analisis|analisislah|cek|lihat|periksa|bagaimana|kondisi|review)\s+(\w+)",
+        r"(?:analisa|analisis|analisislah|cek|lihat|periksa|bagaimana|kondisi|review|fundamental|teknikal|lengkap)\s+.*?(\w{2,5})\W*$",
         r"apakah\s+(\w+)\s+layak",
         r"bagaimana\s+(?:dengan\s+)?(\w+)",
         r"^(?:saham\s+)?(\w{2,5})$",
