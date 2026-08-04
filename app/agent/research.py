@@ -371,6 +371,7 @@ def run_research(query: str) -> ResearchReport:
 
 _SUMMARY_LABELS = ("ringkasan eksekutif", "ringkasan", "eksekutif", "kesimpulan", "rangkuman", "conclusion", "summary")
 _RECS_LABELS = ("rekomendasi", "recommendation", "recommendations")
+_KNOWN_SECTION_LABELS = {label.lower() for label in REPORT_SECTION_LABELS.values()}
 
 
 def _normalize_line(line: str) -> str:
@@ -385,6 +386,9 @@ def _match_section(line: str) -> tuple[str, str] | None:
                 return section, ""
             if norm.startswith(label + ":"):
                 return section, line.split(":", 1)[1].strip().lstrip("*#").strip()
+    stripped = line.strip()
+    if stripped.startswith("#") or norm in _KNOWN_SECTION_LABELS or any(norm.startswith(v + ":") for v in _KNOWN_SECTION_LABELS):
+        return "ignore", ""
     return None
 
 
