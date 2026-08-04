@@ -3,6 +3,7 @@ from unittest.mock import patch
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
 from app.agent.research import run_research
 from app.models.analysis import AIAnalysis
+from app.models.research import SectionStatus
 
 
 def test_analyze_with_ai_no_data():
@@ -339,7 +340,79 @@ def test_enrich_financials_deterministic_and_normalized():
     m2 = enrich_financials(_RAW_FIN)
     assert m1 == m2, "enrichment harus deterministik"
     assert m1["revenue"] == {"latest": 110000000000000.0, "yoy_pct": 10.0}
-    assert set(m1) == {"revenue", "net_income", "total_debt", "cash", "equity", "free_cash_flow"}
+    assert set(m1) == {"revenue", "net_income", "total_debt", "cash", "equity", "free_cash_flow", "roe", "npm"}
+
+
+_ADRO_RAW = {
+    "financials": {
+        "2026-03-31": {"Total Revenue": 8004.91, "Net Income Common Stockholders": 2442.28}
+    },
+    "balance_sheet": {
+        "2026-03-31": {
+            "Total Assets": 122144.31,
+            "Total Liabilities": 29949.2,
+            "Stockholders Equity": 92195.11,
+        }
+    },
+    "cashflow": {},
+    "derived": {
+        "2026-03-31": {"Diluted EPS": 286.52, "Book Value": 3136.99}
+    },
+}
+
+
+def test_enrich_ratios_adro_yahoo_raw_plus_idx_derived():
+    from app.agent.enrichment import enrich_financials
+    m = enrich_financials(_ADRO_RAW, price=2258.63, info_fundamentals={"trailingPE": 7.89})
+    assert m["der"] == 0.3248
+    assert m["roe"] == 0.0265
+    assert m["roa"] == 0.02
+    assert m["npm"] == 0.3051
+    assert m["pbv"] == 0.72
+    assert m["per"] == 7.89
+
+
+def test_enrich_per_prefers_info_when_raw_eps_unit_mismatch():
+    from app.agent.enrichment import enrich_financials
+    raw = {
+        "financials": {"2025-12-31": {"Total Revenue": 1000.0, "Net Income Common Stockholders": 200.0}},
+        "balance_sheet": {"2025-12-31": {"Total Assets": 5000.0, "Total Liabilities": 1000.0, "Stockholders Equity": 4000.0}},
+    }
+    m = enrich_financials(raw, price=2258.63, info_fundamentals={"trailingPE": 21.24})
+    assert m["per"] == 21.24, "info.trailingPE yang valid harus menang, bukan raw EPS yang salah satuan"
+
+
+def test_enrich_pbv_skipped_when_book_missing_and_info_pb_absurd():
+    from app.agent.enrichment import enrich_financials
+    raw = {
+        "financials": {"2025-12-31": {"Total Revenue": 1000.0, "Net Income Common Stockholders": 200.0}},
+        "balance_sheet": {"2025-12-31": {"Total Assets": 5000.0, "Total Liabilities": 1000.0, "Stockholders Equity": 4000.0}},
+    }
+    m = enrich_financials(raw, price=2258.63, info_fundamentals={"priceToBook": 14470.0})
+    assert "pbv" not in m, "pbv info yang absurd (14470) tidak boleh ikut"
+
+
+def test_leaf_level_merge_fills_ratio_keys_without_removing_info():
+    rd = _rd_with_data(fundamentals={"trailingPE": 21.24, "beta": 1.1}, raw_fin=_ADRO_RAW)
+    fund = rd.sections["fundamental"].data["BBCA"]
+    assert fund["trailingPE"] == 21.24
+    assert fund["beta"] == 1.1
+    assert fund["der"] is not None
+    assert fund["roe"] is not None
+    assert fund["roa"] is not None
+    assert fund["npm"] is not None
+    val = rd.sections["valuation"].data["BBCA"]
+    assert val["pbv"] is not None
+
+
+def test_sparse_info_sections_still_filled_with_computed_ratios():
+    rd = _rd_with_data(fundamentals={}, raw_fin=_ADRO_RAW)
+    fund = rd.sections["fundamental"].data["BBCA"]
+    assert rd.sections["fundamental"].status == SectionStatus.AVAILABLE
+    assert fund["der"] is not None and fund["roe"] is not None
+    assert fund["roa"] is not None and fund["npm"] is not None
+    val = rd.sections["valuation"].data["BBCA"]
+    assert val["pbv"] is not None
 
 
 def test_enrich_price_position_and_volatility():

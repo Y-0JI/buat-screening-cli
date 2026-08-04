@@ -86,4 +86,50 @@ def test_get_price_no_data(provider):
     assert price is None
 
 
+def test_fetch_financials_derived_shape(provider):
+    session = MagicMock()
+
+    def get_side_effect(url, params=None, **kwargs):
+        resp = MagicMock()
+        if "GetApiDataPaginated" in url:
+            resp.json.return_value = {
+                "data": [
+                    {"code": "ADRO", "fsDate": "2026-03-31", "eps": 286.52, "bookValue": 3136.99},
+                    {"code": "BBCA", "fsDate": "2026-03-31", "eps": 200.0, "bookValue": 1500.0},
+                ]
+            }
+        else:
+            resp.json.return_value = {}
+        return resp
+
+    session.get.side_effect = get_side_effect
+    with patch.object(provider, "_session", session):
+        out = provider.fetch_financials("ADRO")
+    assert out == {
+        "derived": {
+            "2026-03-31": {
+                "Diluted EPS": 286.52,
+                "Book Value": 3136.99,
+            }
+        }
+    }, "harus pick baris yang code-nya cocok dan map ke shape derived"
+
+
+def test_fetch_financials_empty_when_ticker_not_found(provider):
+    session = MagicMock()
+
+    def get_side_effect(url, params=None, **kwargs):
+        resp = MagicMock()
+        if "GetApiDataPaginated" in url:
+            resp.json.return_value = {"data": [{"code": "BBCA", "fsDate": "2026-03-31", "eps": 1, "bookValue": 1}]}
+        else:
+            resp.json.return_value = {}
+        return resp
+
+    session.get.side_effect = get_side_effect
+    with patch.object(provider, "_session", session):
+        out = provider.fetch_financials("GAGAL")
+    assert out == {}
+
+
 
