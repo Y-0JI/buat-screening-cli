@@ -8,6 +8,7 @@ REPORT_SECTIONS = (
     "company",
     "price",
     "technical",
+    "comparison",
     "risk",
     "fundamental",
     "financial",
@@ -17,6 +18,23 @@ REPORT_SECTIONS = (
     "market_intelligence",
     "investment_conclusion",
 )
+
+REPORT_SECTION_LABELS = {
+    "executive_summary": "Ringkasan Eksekutif",
+    "market": "Market Overview",
+    "company": "Company Overview",
+    "price": "Price Analysis",
+    "technical": "Technical Analysis",
+    "comparison": "Comparison",
+    "risk": "Risk Assessment",
+    "fundamental": "Fundamental Analysis",
+    "financial": "Financial Analysis",
+    "valuation": "Valuation",
+    "growth": "Growth",
+    "dividend": "Dividend",
+    "market_intelligence": "Market Intelligence",
+    "investment_conclusion": "Investment Conclusion",
+}
 
 SCHEMA_VERSION = 1
 
