@@ -13,6 +13,31 @@ from app.tools.registry import ProviderRegistry
 _last_rate_limit: list[float] = [0.0]  # mutable for shared cooldown across modules
 _invalid_tickers: set[str] = set()  # session cache ticker delisted
 
+# fundamental fields available in yfinance info, picked from Data Availability Audit
+_FUNDAMENTAL_FIELDS = (
+    "beta", "bookValue", "earningsGrowth", "earningsQuarterlyGrowth", "enterpriseToRevenue",
+    "epsCurrentYear", "epsForward", "epsTrailingTwelveMonths", "forwardEps", "forwardPE",
+    "grossMargins", "operatingMargins", "payoutRatio", "pegRatio", "priceEpsCurrentYear",
+    "priceToBook", "profitMargins", "recommendationKey", "recommendationMean",
+    "returnOnEquity", "revenueGrowth", "revenuePerShare", "targetHighPrice",
+    "targetLowPrice", "targetMeanPrice", "targetMedianPrice", "totalCash",
+    "totalCashPerShare", "totalDebt", "totalRevenue", "trailingAnnualDividendRate",
+    "trailingAnnualDividendYield", "trailingEps", "trailingPE", "trailingPegRatio",
+    "dividendRate", "dividendYield", "fiveYearAvgDividendYield",
+)
+
+
+def _extract_fundamentals(info: dict) -> dict[str, float | str]:
+    out: dict[str, float | str] = {}
+    for key in _FUNDAMENTAL_FIELDS:
+        val = info.get(key)
+        if val is None:
+            continue
+        if isinstance(val, (int, float)) and val == 0.0:
+            continue  # yfinance fills some fields with 0.0 placeholder, not real data
+        out[key] = val
+    return out
+
 
 class YahooFinanceProvider(Provider):
     def fetch(self, ticker: str, period: str = "6mo", need_profile: bool = True) -> StockData | None:
@@ -37,6 +62,7 @@ class YahooFinanceProvider(Provider):
                         market=info.get("market"),
                         market_cap=info.get("marketCap"),
                         currency=info.get("currency", "IDR"),
+                        fundamentals=_extract_fundamentals(info),
                     )
                 else:
                     stock_info = StockInfo(ticker=ticker.upper(), name=ticker.upper())
@@ -75,6 +101,21 @@ class YahooFinanceProvider(Provider):
                 else:
                     logger.warning(f"Gagal fetch {ticker} setelah 3 percobaan: {e}")
                     return None
+
+    def fetch_financials(self, ticker: str) -> dict:
+        """Lazy: financial statements, only for full research reports.
+
+        Not called by any fast path (screen/score/analyze).
+        """
+        stock = yf.Ticker(ticker.upper() + ".JK")
+        out = {}
+        for name, attr in (("financials", stock.financials), ("balance_sheet", stock.balance_sheet), ("cashflow", stock.cashflow), ("dividends", stock.dividends)):
+            try:
+                if attr is not None and not attr.empty:
+                    out[name] = attr.to_dict()
+            except Exception:
+                pass
+        return out
 
     def get_price(self, ticker: str) -> float | None:
         if ticker.upper() in _invalid_tickers:

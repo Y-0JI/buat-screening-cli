@@ -222,6 +222,49 @@ def test_research_two_topics_both_in_memory():
     assert len(entries) == 2, "dua riset beda topik harus dua entri, bukan saling menimpa"
 
 
+def test_build_research_data_fills_sections():
+    from app.agent.research import build_research_data
+    from app.models.research import SectionStatus
+    from app.parser.intent import ResearchIntent
+    a = AIAnalysis(
+        ticker="BBCA", summary="ok",
+        key_metrics={"RSI": "53.8"},
+        raw_data=_mock_stock_data(),
+        screening_results=None,
+    )
+    a.raw_data.info.fundamentals = {"trailingPE": 13.4, "returnOnEquity": 0.22, "dividendYield": 5.63, "priceToBook": 3.0}
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, {"BBCA": ["Data lama"]})
+    assert rd.schema_version == 1
+    assert rd.sections["company"].status == SectionStatus.AVAILABLE
+    assert rd.sections["company"].data["BBCA"]["sector"] == "Finance"
+    assert rd.sections["price"].data["BBCA"]["price"] == a.raw_data.history[-1].close
+    assert rd.sections["fundamental"].data["BBCA"]["trailingPE"] == 13.4
+    assert rd.sections["valuation"].data["BBCA"]["priceToBook"] == 3.0
+    assert rd.sections["dividend"].data["BBCA"]["dividendYield"] == 5.63
+    assert rd.sections["risk"].data["BBCA"]["caveats"] == ["Data lama"]
+    assert rd.sections["financial"].status == SectionStatus.MISSING
+    assert rd.sections["market_intelligence"].status == SectionStatus.MISSING
+    assert rd.symbol == "BBCA"
+
+
+def test_build_research_data_immutable():
+    from dataclasses import FrozenInstanceError
+    from app.agent.research import build_research_data
+    from app.parser.intent import ResearchIntent
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, None, {})
+    try:
+        rd.symbol = "XX"
+        assert False, "ResearchData harus read-only setelah normalisasi"
+    except FrozenInstanceError:
+        pass
+
+
+def test_extract_fundamentals_filters_placeholders():
+    from app.tools.yahoo_finance import _extract_fundamentals
+    out = _extract_fundamentals({"trailingPE": 13.4, "beta": 0.0, "profitMargins": 0.0, "totalDebt": 0, "recommendationKey": "strong_buy", "missing": None})
+    assert out == {"trailingPE": 13.4, "recommendationKey": "strong_buy"}
+
+
 def test_research_failed_no_memory_entry():
     import tempfile
     from app.memory import MemoryStore
