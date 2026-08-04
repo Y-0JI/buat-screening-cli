@@ -1,3 +1,4 @@
+import re
 import sys
 import typer
 from app.config.settings import settings
@@ -7,7 +8,7 @@ from app.agent.research import run_research
 from app.router.engine import fetch_stock, build_context, run_screening, bulk_screen, bulk_gainers, bulk_losers, health_summary as provider_health
 from app.services.stock_list import get_all, search, get_discovered_tickers, resolve_name
 from app.presenters.rich_presenter import console, RichPresenter
-from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse
+from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse, parse_full
 from app.services.validate_universe import run as validate_run, last_validated_days
 from app.services.watchlist import (
     create as wl_create,
@@ -121,8 +122,13 @@ def compare(
     ticker1: str = typer.Argument(help="Ticker pertama (atau dua ticker pisah koma)"),
     ticker2: str = typer.Argument("", help="Ticker kedua (opsional)"),
 ) -> None:
-    tickers_str = f"{ticker1},{ticker2}" if ticker2 else ticker1
-    tickers = [normalize(t) for t in tickers_str.replace(",", " ").split()]
+    _run_compare(f"{ticker1},{ticker2}" if ticker2 else ticker1)
+
+
+def _run_compare(tickers_str: str) -> None:
+    """Logika compare — dipakai command compare() dan natural() (typer-command
+    tidak bisa dipanggil manual: parameter dengan default jadi ArgumentInfo)."""
+    tickers = [normalize(t) for t in tickers_str.replace(",", " ").split() if t]
     for t in tickers:
         err = validate_symbol(t)
         if err:
@@ -141,6 +147,10 @@ def screen(
     sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
 ) -> None:
+    _run_screen(sector, limit)
+
+
+def _run_screen(sector: Optional[str], limit: int = 10) -> None:
     _warn_universe_age()
     symbols = get_discovered_tickers()
     if sector:
@@ -217,15 +227,22 @@ def stocks(query: Optional[str] = typer.Argument(None, help="Cari kode/nama saha
 
 @app.command()
 def natural(query: str) -> None:
-    intent, params = parse(query)
+    result = parse_full(query, get_all())
+    if result.ambiguity.ambiguous:
+        resolved = _resolve_ambiguity_flow(result)
+        if resolved is None:
+            return
+        natural(_substitute_ticker(query, result.ambiguity.invalid, resolved))
+        return
+    intent, params = result.intent, result.params
     if intent == "analyze":
         analyze(params.get("ticker", ""))
     elif intent == "compare":
         tk = params.get("tickers", "")
-        compare(tk)
+        _run_compare(tk)
     elif intent == "screen":
         sector_filter = params.get("sector")
-        screen(sector=sector_filter)
+        _run_screen(sector_filter)
     elif intent == "research":
         research(params.get("text", query))
     elif intent == "help":
@@ -238,8 +255,64 @@ def natural(query: str) -> None:
             _p.error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'info'")
 
 
+def _resolve_ambiguity(candidates: list[str]) -> str | None:
+    """Interaksi murni: tampil pilihan bernomor, baca input, return pilihan.
+    None = batal / non-TTY / pilihan tidak valid. Tanpa routing/business logic."""
+    if not candidates or not sys.stdin.isatty():
+        return None
+    console.print("\n[bold yellow]Query kamu ambigu. Maksud kamu:[/bold yellow]")
+    for i, c in enumerate(candidates, 1):
+        console.print(f"  [cyan]{i}.[/cyan] {c}")
+    console.print(f"  [cyan]{len(candidates) + 1}.[/cyan] Lainnya")
+    try:
+        choice = console.input("[bold]Pilih nomor: [/bold]").strip()
+    except (EOFError, KeyboardInterrupt):
+        return None
+    if not choice.isdigit():
+        return None
+    n = int(choice)
+    if 1 <= n <= len(candidates):
+        return candidates[n - 1]
+    return None
+
+
+def _resolve_ambiguity_flow(result) -> str | None:
+    """Alur klarifikasi: pesan sesuai reason ambiguity, lalu interaksi pilihan.
+    Return ticker terpilih atau None (batal). Bukan routing workflow."""
+    a = result.ambiguity
+    if a.reason == "multi_intent":
+        _p.info("Query kamu ambigu (beberapa maksud terdeteksi). Pisah jadi perintah terpisah, contoh: 'bandingkan A dan B' lalu 'riset sektor X'.")
+        return None
+    if a.reason == "invalid_ticker" and (not a.candidates or len(a.invalid) > 1):
+        _p.info(f"Ticker tidak dikenal: {', '.join(a.invalid)}. Periksa kode saham atau jalankan 'stocks <nama>' untuk mencari.")
+        return None
+    if not a.candidates:
+        _p.info("Query kamu ambigu. Coba ulangi dengan maksud yang lebih jelas.")
+        return None
+    choice = _resolve_ambiguity(a.candidates)
+    if choice is None:
+        _p.info("Klarifikasi dibatalkan. Jalankan ulang dengan pilihan yang jelas.")
+    return choice
+
+
+def _substitute_ticker(query: str, tokens: list[str], chosen: str) -> str:
+    """Ganti kata yang tidak dikenal di query ASLI dengan pilihan user (word-boundary,
+    case-insensitive) — mempertahankan struktur dan maksud permintaan asli,
+    bukan membuat query baru yang membuang intent."""
+    out = query
+    for tok in tokens:
+        out = re.sub(rf"\b{re.escape(tok)}\b", chosen, out, flags=re.IGNORECASE)
+    return out
+
+
 @app.command()
 def research(query: str) -> None:
+    result = parse_full(query, get_all())
+    if result.ambiguity.ambiguous:
+        resolved = _resolve_ambiguity_flow(result)
+        if resolved is None:
+            return
+        query = _substitute_ticker(query, result.ambiguity.invalid, resolved)
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
         report = run_research(query)
     if report.intent.type == "unsupported":
