@@ -90,14 +90,16 @@ def test_ask_llm_memory_injected(mock_llm):
 
 
 def test_research_memory_injected():
-    with patch("app.agent.research.fetch_stock") as mock_fetch:
-        mock_fetch.return_value = _mock_stock_data()
-        with patch("app.agent.research.analyze_with_ai") as mock_analyze:
-            mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
-            with patch("app.agent.research.chat_completion") as mock_llm:
-                mock_llm.return_value = "Ringkasan Eksekutif: tes\nRekomendasi:\n1. hold"
-                run_research("analisa BBCA")
-                _assert_no_memory_placeholder(mock_llm.call_args.args[0])
+    with patch("app.agent.research.get_provider") as mock_provider:
+        mock_provider.return_value.fetch_financials.return_value = _RAW_FIN
+        with patch("app.agent.research.fetch_stock") as mock_fetch:
+            mock_fetch.return_value = _mock_stock_data()
+            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
+                with patch("app.agent.research.chat_completion") as mock_llm:
+                    mock_llm.return_value = "Ringkasan Eksekutif: tes\nRekomendasi:\n1. hold"
+                    run_research("analisa BBCA")
+                    _assert_no_memory_placeholder(mock_llm.call_args.args[0])
 
 
 def test_analyze_caveats_rendered_cleanly():
@@ -152,17 +154,19 @@ def test_research_unsupported_query_no_ai():
 def test_research_compare_partial_sends_all_tickers():
     with patch("app.agent.research.fetch_stock") as mock_fetch:
         mock_fetch.side_effect = lambda t: _mock_stock_data() if t == "BBCA" else None
-        with patch("app.agent.core.fetch_stock") as mock_core_fetch:
-            mock_core_fetch.side_effect = lambda t: _mock_stock_data() if t == "BBCA" else None
-            with patch("app.agent.core.chat_completion") as mock_llm_core:
-                mock_llm_core.return_value = "BBCA stabil."
-                with patch("app.agent.research.chat_completion") as mock_llm:
-                    mock_llm.return_value = "Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold"
-                    with patch("app.agent.research.compare_with_ai") as mock_compare:
-                        mock_compare.return_value = {"type": "comparison", "analysis": "x"}
-                        report = run_research("bandingkan BBCA dan BBRI")
-                        assert report.failed == ["BBRI"]
-                        mock_compare.assert_called_once_with(["BBCA", "BBRI"])
+        with patch("app.agent.research.get_provider") as mock_provider:
+            mock_provider.return_value.fetch_financials.return_value = _RAW_FIN
+            with patch("app.agent.core.fetch_stock") as mock_core_fetch:
+                mock_core_fetch.side_effect = lambda t: _mock_stock_data() if t == "BBCA" else None
+                with patch("app.agent.core.chat_completion") as mock_llm_core:
+                    mock_llm_core.return_value = "BBCA stabil."
+                    with patch("app.agent.research.chat_completion") as mock_llm:
+                        mock_llm.return_value = "Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold"
+                        with patch("app.agent.research.compare_with_ai") as mock_compare:
+                            mock_compare.return_value = {"type": "comparison", "analysis": "x"}
+                            report = run_research("bandingkan BBCA dan BBRI")
+                            assert report.failed == ["BBRI"]
+                            mock_compare.assert_called_once_with(["BBCA", "BBRI"])
 
 
 def test_research_saves_summary_to_memory():
@@ -172,14 +176,16 @@ def test_research_saves_summary_to_memory():
     fd, path = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     store = MemoryStore(path=path)
-    with patch("app.agent.research.get_store", return_value=store):
-        with patch("app.agent.research.fetch_stock") as mock_fetch:
-            mock_fetch.return_value = _mock_stock_data()
-            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
-                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
-                with patch("app.agent.research.chat_completion") as mock_llm:
-                    mock_llm.return_value = "Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold"
-                    run_research("analisa BBCA")
+    with patch("app.agent.research.get_provider") as mock_provider:
+        mock_provider.return_value.fetch_financials.return_value = _RAW_FIN
+        with patch("app.agent.research.get_store", return_value=store):
+            with patch("app.agent.research.fetch_stock") as mock_fetch:
+                mock_fetch.return_value = _mock_stock_data()
+                with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                    mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes")
+                    with patch("app.agent.research.chat_completion") as mock_llm:
+                        mock_llm.return_value = "Ringkasan Eksekutif: BBCA bagus\nRekomendasi:\n1. hold"
+                        run_research("analisa BBCA")
     entries = [e for e in store.get_all() if e.type == MemoryType.RESEARCH_FINDING and e.source.startswith("research:")]
     assert entries, "riset sukses harus menyimpan entri memori"
     assert "Laporan riset (single_stock)" in entries[0].content
@@ -272,19 +278,96 @@ def test_research_ai_failure_falls_back_and_keeps_research_data():
     fd, path = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     store = MemoryStore(path=path)
-    with patch("app.agent.research.get_store", return_value=store):
-        with patch("app.agent.research.fetch_stock") as mock_fetch:
-            mock_fetch.return_value = _mock_stock_data()
-            with patch("app.agent.research.analyze_with_ai") as mock_analyze:
-                mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes", raw_data=_mock_stock_data())
-                with patch("app.agent.research.chat_completion") as mock_llm:
-                    mock_llm.return_value = None
-                    report = run_research("analisa BBCA")
+    with patch("app.agent.research.get_provider") as mock_provider:
+        mock_provider.return_value.fetch_financials.return_value = _RAW_FIN
+        with patch("app.agent.research.get_store", return_value=store):
+            with patch("app.agent.research.fetch_stock") as mock_fetch:
+                mock_fetch.return_value = _mock_stock_data()
+                with patch("app.agent.research.analyze_with_ai") as mock_analyze:
+                    mock_analyze.return_value = AIAnalysis(ticker="BBCA", summary="Ringkasan tes", raw_data=_mock_stock_data())
+                    with patch("app.agent.research.chat_completion") as mock_llm:
+                        mock_llm.return_value = None
+                        report = run_research("analisa BBCA")
     assert report.ai_failed is True
     assert report.research_data is not None, "ResearchData harus tetap tersimpan walau AI gagal"
     assert report.research_data.sections["company"].status == SectionStatus.AVAILABLE
     assert "otomatis" in report.executive_summary
     assert store.count() == 0, "AI gagal tidak boleh menyimpan laporan"
+
+
+_RAW_FIN = {
+    "financials": {
+        "2025-12-31": {"Total Revenue": 1.1e14, "Net Income Common Stockholders": 5.8e13},
+        "2024-12-31": {"Total Revenue": 1.0e14},
+    },
+    "balance_sheet": {
+        "2025-12-31": {"Total Debt": 5.2e13, "Cash And Cash Equivalents": 7.8e13, "Stockholders Equity": 2.5e14}
+    },
+    "cashflow": {"2025-12-31": {"Free Cash Flow": 3.0e13}},
+}
+
+
+def _rd_with_data(fundamentals=None, raw_fin=None):
+    from app.agent.enrichment import enrich_financials
+    from app.agent.research import _financials_cache, build_research_data, enrich_research_data
+    from app.parser.intent import ResearchIntent
+    _financials_cache.clear()
+    a = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={"RSI": "53.8"}, raw_data=_mock_stock_data(), screening_results=None)
+    a.raw_data.info.fundamentals = fundamentals or {"fiftyTwoWeekHigh": 9000.0, "fiftyTwoWeekLow": 5000.0}
+    rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, None, {})
+    with patch("app.agent.research.get_provider") as mock_provider:
+        mock_provider.return_value.fetch_financials.return_value = raw_fin if raw_fin is not None else _RAW_FIN
+        enrich_research_data(rd, {"BBCA": a})
+    _financials_cache.clear()
+    return rd
+
+
+def test_enrich_financials_deterministic_and_normalized():
+    from app.agent.enrichment import enrich_financials
+    m1 = enrich_financials(_RAW_FIN)
+    m2 = enrich_financials(_RAW_FIN)
+    assert m1 == m2, "enrichment harus deterministik"
+    assert m1["revenue"] == {"latest": 110000000000000.0, "yoy_pct": 10.0}
+    assert set(m1) == {"revenue", "net_income", "total_debt", "cash", "equity", "free_cash_flow"}
+
+
+def test_enrich_price_position_and_volatility():
+    from app.agent.research import build_report_prompt
+    close = _mock_stock_data().history[-1].close
+    rd = _rd_with_data()
+    price = rd.sections["price"].data["BBCA"]
+    assert price["week52_high"] == 9000.0 and price["week52_low"] == 5000.0
+    assert abs(price["pct_from_high"] - ((close - 9000.0) / 9000.0 * 100)) < 0.01
+    assert abs(price["pct_from_low"] - ((close - 5000.0) / 5000.0 * 100)) < 0.01
+    assert isinstance(rd.sections["risk"].data["BBCA"]["volatility_annual_pct"], float)
+
+
+def test_research_data_holds_metrics_not_raw_statements():
+    rd = _rd_with_data()
+    fin = rd.sections["financial"].data["BBCA"]
+    assert "financials" not in fin and "balance_sheet" not in fin and "cashflow" not in fin
+    assert fin["revenue"]["latest"] == 110000000000000.0
+    assert rd.sections["financial"].source == "yahoo financials"
+
+
+def test_report_prompt_has_formatted_financial_no_raw():
+    from app.agent.research import build_report_prompt
+    rd = _rd_with_data()
+    prompt = build_report_prompt(rd)
+    assert "## Financial Analysis" in prompt, "section baru harus ikut schema tanpa ubah builder"
+    assert "Pendapatan 110.0T (+10.0% YoY)" in prompt
+    assert "Total Revenue" not in prompt and "Free Cash Flow" not in prompt, "raw statement tidak boleh masuk prompt"
+
+
+def test_financial_fetch_cached_per_session():
+    from app.agent.research import _financials_cache, _get_financials
+    _financials_cache.clear()
+    with patch("app.agent.research.get_provider") as mock_provider:
+        mock_provider.return_value.fetch_financials.return_value = _RAW_FIN
+        _get_financials("BBCA")
+        _get_financials("BBCA")
+        assert mock_provider.return_value.fetch_financials.call_count == 1, "fetch keuangan harus sekali per sesi"
+    _financials_cache.clear()
 
 
 def test_research_failed_no_memory_entry():
