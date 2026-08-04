@@ -58,9 +58,15 @@ class RichPresenter:
             console.print()
 
         if rd:
-            missing = [k.replace("_", " ") for k, s in rd.sections.items() if s.status.value == "missing"]
+            missing = [s for s in rd.sections.items() if s[1].status.value == "missing"]
             if missing:
-                console.print(f"[dim]Data tidak tersedia: {', '.join(missing)}[/dim]")
+                labels = [f"{k.replace('_', ' ')} ({s.reason})" if s.reason else k.replace("_", " ") for k, s in missing]
+                console.print(f"[dim]Data tidak tersedia: {', '.join(labels)}[/dim]")
+                console.print()
+            partial = [s for s in rd.sections.items() if s[1].status.value == "partial"]
+            if partial:
+                labels = [f"{k.replace('_', ' ')} ({s.reason})" if s.reason else k.replace("_", " ") for k, s in partial]
+                console.print(f"[yellow]Data sebagian: {', '.join(labels)}[/yellow]")
                 console.print()
 
         if report.screening_results:

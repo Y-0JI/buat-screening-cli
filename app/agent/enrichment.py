@@ -1,6 +1,9 @@
 import math
 from statistics import stdev
 
+from app.indicators.engine import sma
+from app.models.stock import HistoricalPrice
+
 
 def compute_volatility(closes: list[float], window: int = 30) -> float | None:
     """Annualized volatility (%) from daily close returns. Deterministic."""
@@ -23,6 +26,19 @@ def compute_price_position(price: float, week52_high: float | None, week52_low: 
     if week52_low:
         out["week52_low"] = week52_low
         out["pct_from_low"] = round((price - week52_low) / week52_low * 100, 2)
+    return out
+
+
+def compute_technical_context(history: list[HistoricalPrice], week52_change_pct: float | None) -> dict:
+    """Technical numbers only (no sentiment labels) — interpretation is the AI's job."""
+    close = history[-1].close
+    out = {"price": round(close, 2)}
+    for period, key in ((20, "vs_sma20_pct"), (50, "vs_sma50_pct")):
+        vals = [v for v in sma(history, period) if v is not None]
+        if vals:
+            out[key] = round((close - vals[-1]) / vals[-1] * 100, 2)
+    if week52_change_pct is not None:
+        out["week52_change_pct"] = round(week52_change_pct * 100, 2)
     return out
 
 

@@ -309,15 +309,19 @@ _RAW_FIN = {
 
 def _rd_with_data(fundamentals=None, raw_fin=None):
     from app.agent.enrichment import enrich_financials
-    from app.agent.research import _financials_cache, build_research_data, enrich_research_data
+    from app.agent.research import _financials_cache, build_research_data, enrich_research_data, enrich_market_intelligence
     from app.parser.intent import ResearchIntent
     _financials_cache.clear()
     a = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={"RSI": "53.8"}, raw_data=_mock_stock_data(), screening_results=None)
-    a.raw_data.info.fundamentals = fundamentals or {"fiftyTwoWeekHigh": 9000.0, "fiftyTwoWeekLow": 5000.0}
+    a.raw_data.info.fundamentals = fundamentals or {
+        "fiftyTwoWeekHigh": 9000.0, "fiftyTwoWeekLow": 5000.0, "52WeekChange": -0.238,
+        "recommendationKey": "strong_buy", "recommendationMean": 1.38, "targetMeanPrice": 8074.84,
+    }
     rd = build_research_data(ResearchIntent("single_stock", ["BBCA"], None, "q"), None, {"BBCA": a}, None, {})
     with patch("app.agent.research.get_provider") as mock_provider:
         mock_provider.return_value.fetch_financials.return_value = raw_fin if raw_fin is not None else _RAW_FIN
         enrich_research_data(rd, {"BBCA": a})
+    enrich_market_intelligence(rd, {"BBCA": a})
     _financials_cache.clear()
     return rd
 
@@ -347,7 +351,7 @@ def test_research_data_holds_metrics_not_raw_statements():
     fin = rd.sections["financial"].data["BBCA"]
     assert "financials" not in fin and "balance_sheet" not in fin and "cashflow" not in fin
     assert fin["revenue"]["latest"] == 110000000000000.0
-    assert rd.sections["financial"].source == "yahoo financials"
+    assert rd.sections["financial"].source == "yfinance.financials"
 
 
 def test_report_prompt_has_formatted_financial_no_raw():
@@ -368,6 +372,44 @@ def test_financial_fetch_cached_per_session():
         _get_financials("BBCA")
         assert mock_provider.return_value.fetch_financials.call_count == 1, "fetch keuangan harus sekali per sesi"
     _financials_cache.clear()
+
+
+def test_market_intelligence_container_single_stock():
+    from app.models.research import REASON_NO_MARKET_CONTEXT, REASON_NEWS_UNAVAILABLE, SectionStatus
+    rd = _rd_with_data()
+    mi = rd.sections["market_intelligence"]
+    slot = mi.data["BBCA"]
+    assert mi.status == SectionStatus.PARTIAL
+    assert mi.reason == REASON_NEWS_UNAVAILABLE
+    assert "derived(price_history)" in mi.source and "yfinance.info" in mi.source
+    assert slot["market_context"] == {"available": False, "reason": REASON_NO_MARKET_CONTEXT}, \
+        "konteks pasar tidak boleh diinferensikan dari satu saham"
+    assert slot["analyst_sentiment"]["recommendation_key"] == "strong_buy"
+    assert slot["analyst_sentiment"]["target_mean"] == 8074.84
+    assert slot["technical_context"]["week52_change_pct"] == -23.8
+    assert slot["news_availability"] == {"status": "unavailable", "reason": REASON_NEWS_UNAVAILABLE}
+    assert "bullish" not in str(slot["technical_context"]).lower(), "interpretasi bukan bagian kontrak"
+
+
+def test_market_context_only_from_real_market_data():
+    from app.agent.research import build_research_data, enrich_market_intelligence
+    from app.parser.intent import ResearchIntent
+    from app.screeners.engine import ScreeningResult
+    a = AIAnalysis(ticker="BBCA", summary="ok", key_metrics={}, raw_data=_mock_stock_data(), screening_results=None)
+    scr = [{"ticker": "BBCA", "sector": "Financials", "top_signal": ScreeningResult(ticker="BBCA", signal="BUY", confidence=0.85, reason="x"), "max_confidence": 0.85}]
+    rd = build_research_data(ResearchIntent("sector_theme", [], "financials", "q"), scr, {"BBCA": a}, None, {})
+    enrich_market_intelligence(rd, {"BBCA": a})
+    assert rd.sections["market_intelligence"].data["BBCA"]["market_context"]["available"] is True
+
+
+def test_market_intelligence_in_prompt_concise():
+    from app.agent.research import build_report_prompt
+    rd = _rd_with_data()
+    prompt = build_report_prompt(rd)
+    assert "## Market Intelligence" in prompt
+    assert "analis strong_buy (1.38), target 8074.84" in prompt
+    assert "berita: tidak tersedia (news_unavailable)" in prompt
+    assert "analyst_sentiment" not in prompt, "key internal tidak boleh bocor ke prompt"
 
 
 def test_research_failed_no_memory_entry():

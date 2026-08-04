@@ -24,7 +24,7 @@ _FUNDAMENTAL_FIELDS = (
     "totalCashPerShare", "totalDebt", "totalRevenue", "trailingAnnualDividendRate",
     "trailingAnnualDividendYield", "trailingEps", "trailingPE", "trailingPegRatio",
     "dividendRate", "dividendYield", "fiveYearAvgDividendYield",
-    "fiftyTwoWeekHigh", "fiftyTwoWeekLow",
+    "fiftyTwoWeekHigh", "fiftyTwoWeekLow", "52WeekChange",
 )
 
 
