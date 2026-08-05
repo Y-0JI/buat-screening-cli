@@ -46,6 +46,17 @@ def test_resolve_followup_pure_no_context():
     assert resolve_followup("bandingkan bca dan bri", parse_full("bandingkan bca dan bri", _U), _CTX) is None, "compare 2 ticker tak perlu konteks"
 
 
+def test_resolve_followup_ticker_from_source():
+    assert resolve_followup("vs bbri", parse_full("vs bbri", _U), "BBCA: stabil", "BBCA") == "bandingkan BBCA dan BBRI", \
+        "source ticker polos = konteks ticker (jalur analyze cepat)"
+    assert resolve_followup("vs bbri", parse_full("vs bbri", _U), "Perbandingan BBCA, BBRI: x", "compare:BBCA,BBRI") == "bandingkan BBCA dan BBRI", \
+        "source compare: -> ticker pertama"
+    assert resolve_followup("vs bbri", parse_full("vs bbri", _U), "Laporan riset (single_stock) 'analisa BBCA':\nx", "research:single_stock:BBCA") == "bandingkan BBCA dan BBRI", \
+        "source research: -> tetap parse query dari content"
+    assert resolve_followup("vs bri", parse_full("vs bri", _U), "BBCA: stabil", "BBCA", _U) == "bandingkan BBCA dan BBRI", \
+        "ticker query pendek harus dikanonikali via universe (bri -> BBRI)"
+
+
 def test_execution_context_data_carrier():
     r = parse_full("analisa bbca", _U)
     ctx = ExecutionContext(query="analisa bbca", parse_result=r, last_context=_CTX, workflow="analyze")

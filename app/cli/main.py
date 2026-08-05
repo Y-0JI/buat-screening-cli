@@ -35,7 +35,7 @@ from app.services.watchlist import (
 )
 from app.validation import normalize, validate as validate_symbol
 from app.memory import get_store
-from app.memory.models import MemoryType
+from app.memory.models import MemoryEntry, MemoryType
 from typing import Optional
 
 _p = RichPresenter()
@@ -314,7 +314,7 @@ def _try_followup(query: str, result) -> bool:
     last = _last_research_context()
     if last is None:
         return False
-    resolved = resolve_followup(query, result, last)
+    resolved = resolve_followup(query, result, last.content, last.source, get_all())
     if resolved is None:
         return False
     logger.info("followup resolve: {!r} -> {!r}", query, resolved)
@@ -322,10 +322,16 @@ def _try_followup(query: str, result) -> bool:
     return True
 
 
-def _last_research_context() -> str | None:
+def _last_research_context() -> MemoryEntry | None:
+    """Entri RESEARCH_FINDING terakhir yang bisa jadi konteks follow-up.
+    Terima semua bentuk source: riset ('research:*'), perbandingan
+    ('compare:*'), dan analyze cepat (source = ticker polos)."""
     for e in reversed(get_store().get_all()):
-        if e.type == MemoryType.RESEARCH_FINDING and e.source and e.source.startswith("research:"):
-            return e.content
+        if e.type != MemoryType.RESEARCH_FINDING or not e.source:
+            continue
+        if e.source.startswith("research:") or e.source.startswith("compare:") \
+                or re.fullmatch(r"[A-Z0-9.]{1,10}", e.source):
+            return e
     return None
 
 

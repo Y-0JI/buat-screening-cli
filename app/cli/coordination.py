@@ -41,30 +41,59 @@ def route_intent(result: ParseResult, query: str) -> str:
 _FOLLOWUP_COMPARE = re.compile(r"^(?:bandingkan\s+dengan|bandingkan|vs\.?|versus)\s+(\w{2,5})$", re.IGNORECASE)
 
 
-def resolve_followup(query: str, parse_result: ParseResult, last_context: str | None) -> str | None:
-    """Pure 1-hop follow-up: lengkapi query pendek dengan ticker dari last_context.
-    Tidak menyentuh memory/storage — pemanggil yang ambil & pass last_context.
+def resolve_followup(query: str, parse_result: ParseResult, last_context: str | None, last_source: str | None = None, universe=None) -> str | None:
+    """Pure 1-hop follow-up: lengkapi query pendek dengan ticker dari konteks terakhir.
+    Ticker konteks diambil dari `last_source` (ticker polos / compare: / research:),
+    fallback parse content. `universe` (data murni, di-inject seperti parser) dipakai
+    kanonikali ticker query yang pendek ("bri" -> BBRI, pola suffix-match ambiguity).
+    Tidak menyentuh memory/storage — pemanggil yang ambil & pass konteks.
     Tanpa konteks / pola tak cocok -> None (query jalan seperti biasa)."""
     if not last_context:
         return None
-    ctx_ticker = _extract_context_ticker(last_context)
+    ctx_ticker = _extract_context_ticker(last_context, last_source)
     if not ctx_ticker:
         return None
     m = _FOLLOWUP_COMPARE.match(query.strip())
     if m:
-        other = normalize(m.group(1))
-        return f"bandingkan {ctx_ticker} dan {other}"
+        return f"bandingkan {ctx_ticker} dan {_canonical_ticker(m.group(1), universe)}"
     if parse_result.intent == "compare":
         tickers = [t for t in parse_result.params.get("tickers", "").replace(",", " ").split() if t]
         if len(tickers) == 1:
-            return f"bandingkan {ctx_ticker} dan {tickers[0]}"
+            return f"bandingkan {ctx_ticker} dan {_canonical_ticker(tickers[0], universe)}"
     return None
 
 
-def _extract_context_ticker(last_context: str) -> str | None:
-    """Ticker dari entri RESEARCH_FINDING terakhir — query asli ada di dalam
-    single quotes ('analisa BBCA'), di-parse ulang pakai parser yang sama."""
-    m = re.search(r"'([^']*?)'", last_context)
+def _canonical_ticker(raw: str, universe) -> str:
+    """Kanonikali ticker pendek via universe: exact match atau suffix-match
+    ("bri" -> BBRI), pola toleran yang sama dengan ambiguity.py. Tanpa universe
+    -> raw hasil normalize."""
+    t = normalize(raw)
+    if universe:
+        for s in universe:
+            tk = normalize(s["ticker"])
+            if tk == t or tk.endswith(t):
+                return tk
+    return t
+
+
+_CONTEXT_TICKER_SOURCE = re.compile(r"^[A-Z0-9.]{1,10}$")
+
+
+def _extract_context_ticker(content: str, source: str | None) -> str | None:
+    """Ticker dari entri RESEARCH_FINDING terakhir, prioritas source field
+    (tidak bergantung format content):
+    - source ticker polos ('BBCA') -> ticker itu sendiri (jalur analyze cepat)
+    - source 'compare:...' -> ticker pertama (jalur perbandingan)
+    - source 'research:...' -> parse ulang query asli dari content (topic bukan ticker)
+    - source None -> fallback parse content (pemanggil lama)
+    """
+    if source:
+        if source.startswith("compare:"):
+            first = source.split(":", 1)[1].split(",")[0].strip()
+            return normalize(first) if first else None
+        if not source.startswith("research:") and _CONTEXT_TICKER_SOURCE.match(source):
+            return source
+    m = re.search(r"'([^']*?)'", content)
     if not m:
         return None
     _, params = parse(m.group(1))
