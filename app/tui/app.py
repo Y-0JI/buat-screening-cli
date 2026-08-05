@@ -2,8 +2,9 @@ from textual.app import App
 from textual.binding import Binding
 
 from app.tui.executor import SubprocessExecutor
-from app.tui.registry import Feature, FeatureStatus
+from app.tui.registry import Feature, FeatureStatus, build_command
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.viewer import CommandViewerScreen
 
@@ -22,9 +23,16 @@ class ScreeningApp(App):
     def open_feature(self, feature: Feature) -> None:
         if feature.status == FeatureStatus.PLANNED:
             screen = PlannedScreen(feature)
+        elif any(arg.required for arg in feature.args):
+            screen = InputFormScreen(feature)
         else:
-            screen = CommandViewerScreen(feature, self._executor)
+            screen = CommandViewerScreen(feature, feature.command, self._executor)
         self.push_screen(screen)
+
+    def submit_feature(self, feature: Feature, values: dict[str, str]) -> None:
+        argv = build_command(feature, values)
+        self.pop_screen()
+        self.push_screen(CommandViewerScreen(feature, argv, self._executor))
 
     def action_quit_app(self) -> None:
         self.exit()

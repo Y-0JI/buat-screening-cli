@@ -6,13 +6,14 @@ from app.tui.app import ScreeningApp, main
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import FEATURES, GROUPS, FeatureStatus
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.viewer import CommandViewerScreen
 from textual.widgets import Static
 
 
 class _EchoExecutor:
-    def run(self, feature):
+    def run(self, argv):
         return subprocess.Popen(
             ["echo", "hello"],
             stdout=subprocess.PIPE,
@@ -64,19 +65,18 @@ async def test_dashboard_shows_all_groups():
 
 
 @pytest.mark.asyncio
-async def test_dashboard_open_available_feature():
+async def test_dashboard_open_feature_with_required_args_shows_form():
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, CommandViewerScreen)
+        assert isinstance(app.screen, InputFormScreen)
         await pilot.press("q")
 
 
 def test_subprocess_executor_runs_info():
-    feature = next(f for f in FEATURES if f.key == "info")
-    proc = SubprocessExecutor().run(feature)
+    proc = SubprocessExecutor().run(["info"])
     out, _ = proc.communicate(timeout=60)
     assert proc.returncode == 0
     assert out.strip()
@@ -87,7 +87,7 @@ async def test_viewer_streams_output_and_back():
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        await app.push_screen(CommandViewerScreen(feature, _EchoExecutor()))
+        await app.push_screen(CommandViewerScreen(feature, ["info"], _EchoExecutor()))
         await pilot.pause()
         await pilot.pause()
         screen = app.screen
@@ -127,7 +127,7 @@ async def test_full_navigation_flow():
         assert isinstance(app.screen, DashboardScreen)
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, CommandViewerScreen)
+        assert isinstance(app.screen, InputFormScreen)
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
@@ -148,13 +148,13 @@ async def test_viewer_survives_failed_executor():
     feature = next(f for f in FEATURES if f.key == "info")
 
     class _BrokenExecutor:
-        def run(self, feature):
+        def run(self, argv):
             raise FileNotFoundError("screening")
 
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        await app.push_screen(CommandViewerScreen(feature, _BrokenExecutor()))
+        await app.push_screen(CommandViewerScreen(feature, ["info"], _BrokenExecutor()))
         await pilot.pause()
         log = app.screen.query_one("#output")
         assert "Gagal menjalankan" in "\n".join(log.lines)

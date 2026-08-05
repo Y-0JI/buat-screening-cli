@@ -14,9 +14,10 @@ class CommandViewerScreen(Screen):
         Binding("b", "back", "Kembali"),
     ]
 
-    def __init__(self, feature: Feature, executor: Executor) -> None:
+    def __init__(self, feature: Feature, argv: list[str], executor: Executor) -> None:
         super().__init__()
         self._feature = feature
+        self._argv = argv
         self._executor = executor
 
     def compose(self) -> ComposeResult:
@@ -24,14 +25,14 @@ class CommandViewerScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one(Log).write_line(f"$ screening {' '.join(self._feature.command)}")
+        self.query_one(Log).write_line(f"$ screening {' '.join(self._argv)}")
         self._stream()
 
     @work(exclusive=True)
     async def _stream(self) -> None:
         log = self.query_one(Log)
         try:
-            proc = self._executor.run(self._feature)
+            proc = self._executor.run(self._argv)
         except Exception as exc:
             log.write_line(f"✗ Gagal menjalankan: {exc}")
             return
