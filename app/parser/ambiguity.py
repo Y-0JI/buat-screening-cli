@@ -74,6 +74,14 @@ _MULTI_INTENT_PATTERNS = [
 CLAUSE_SEPARATORS = r"(?:lalu|terus|kemudian|selanjutnya|selain\s+itu|setelah\s+itu|dan\s+juga|serta|tapi|tetapi|namun)"
 
 
+def split_clauses(query: str) -> list[str]:
+    """SATU-SATUNYA sumber pemisahan klausa — dipakai detect_multi_intent,
+    orchestration CLI (app/cli/coordination.py), dan di mana pun klausa
+    perlu dipecah supaya perilaku selalu konsisten. Kalau separator perlu
+    ditambah, cukup di satu tempat ini."""
+    return [c.strip() for c in re.split(CLAUSE_SEPARATORS, query) if c.strip()]
+
+
 def detect_multi_intent(query: str, universe) -> bool:
     """Multi-intent = >=2 klausa terpisah pemisah jelas, masing-masing punya
     kata kunci intent kuat, dengan >=2 kategori BERBEDA. Satu kalimat dengan
@@ -83,7 +91,7 @@ def detect_multi_intent(query: str, universe) -> bool:
     # lapisan CLI (app/cli/coordination.py + main.py) — fungsi ini tetap
     # melaporkan fakta "ada >=2 klausa", bukan keputusan workflow.
     """
-    clauses = [c for c in re.split(CLAUSE_SEPARATORS, query.lower()) if c.strip()]
+    clauses = split_clauses(query.lower())
     if len(clauses) < 2:
         return False
     all_intents: set[str] = set()

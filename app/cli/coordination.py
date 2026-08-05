@@ -7,7 +7,7 @@ Helper di sini murni (input -> output), tanpa I/O storage/network.
 import re
 from dataclasses import dataclass
 
-from app.parser.ambiguity import CLAUSE_SEPARATORS
+from app.parser.ambiguity import split_clauses
 from app.parser.intent import ParseResult, parse
 from app.validation import normalize
 
@@ -24,13 +24,6 @@ class ExecutionContext:
     parse_result: ParseResult
     last_context: str | None = None
     workflow: str | None = None
-
-
-def split_clauses(query: str) -> list[str]:
-    """Split query jadi klausa — SATU-SATUNYA sumber pemisahan klausa
-    (pakai CLAUSE_SEPARATORS yang sama dengan parser). Kalau separator
-    perlu ditambah, cukup di satu tempat ini."""
-    return [c.strip() for c in re.split(CLAUSE_SEPARATORS, query) if c.strip()]
 
 
 def route_intent(result: ParseResult, query: str) -> str:
