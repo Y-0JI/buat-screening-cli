@@ -44,6 +44,13 @@ def _mock_fetch(ticker, *args, **kwargs):
     return MOCK_DATA.get(ticker.upper())
 
 
+def _fresh_memory_store():
+    from app.memory import MemoryStore
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    return MemoryStore(path=path)
+
+
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
 def test_analyze_command(mock_fetch):
     result = runner.invoke(app, ["analyze", "BBCA"])
@@ -198,6 +205,87 @@ def test_natural_ambiguity_compare_keeps_intent(mock_fetch, mock_llm):
         result = runner.invoke(app, ["natural", "bandingkan bca dan telekomunikasi"])
     called = [c.args[0] for c in mock_fetch.call_args_list]
     assert "BCA" in called and "MTEL" in called, "maksud compare harus dipertahankan, bukan analyze tunggal"
+
+
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_natural_qualifier_routes_to_research(mock_fetch, mock_llm_core, mock_llm_research):
+    result = runner.invoke(app, ["natural", "fundamental bbca"])
+    assert mock_llm_research.called, "query berqualifier harus rute ke research (full report), bukan analyze biasa"
+    assert result.exit_code == 0
+
+
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="perbandingan")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_natural_multi_intent_orchestrates(mock_fetch, mock_llm_core, mock_llm_research):
+    result = runner.invoke(app, ["natural", "bandingkan BBCA dan BBRI tapi riset bbca"])
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    assert "BBCA" in called and "BBRI" in called, "klausa compare harus dieksekusi"
+    assert mock_llm_research.called, "klausa riset harus dieksekusi"
+    assert result.exit_code == 0
+
+
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="perbandingan")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_natural_multi_intent_continues_after_failure(mock_fetch, mock_llm_core, mock_llm_research):
+    result = runner.invoke(app, ["natural", "bandingkan xyz dan abc tapi riset bbca"])
+    assert mock_llm_research.called, "klausa kedua tetap jalan walau klausa pertama dibatalkan"
+    assert result.exit_code == 0
+
+
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_followup_context_from_analyze_memory(mock_fetch, mock_llm_core):
+    from app.agent.core import analyze_with_ai
+    from app.cli.main import _last_research_context
+    store = _fresh_memory_store()
+    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
+        analyze_with_ai("BBCA")
+        entry = _last_research_context()
+    assert entry is not None, "entri analyze cepat harus terbaca sebagai konteks follow-up"
+    assert entry.source == "BBCA", "source entri analyze = ticker polos"
+
+
+@patch("app.agent.core.chat_completion", return_value="perbandingan")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_followup_context_from_compare_memory(mock_fetch, mock_llm_core):
+    from app.agent.core import compare_with_ai
+    from app.cli.main import _last_research_context
+    store = _fresh_memory_store()
+    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
+        compare_with_ai(["BBCA", "BBRI"])
+        entry = _last_research_context()
+    assert entry is not None, "entri compare harus terbaca sebagai konteks follow-up"
+    assert entry.source == "compare:BBCA,BBRI"
+
+
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_followup_context_from_research_memory(mock_fetch, mock_llm_core, mock_llm_research):
+    from app.cli.main import _last_research_context
+    store = _fresh_memory_store()
+    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store), patch("app.agent.research.get_store", return_value=store):
+        result = runner.invoke(app, ["natural", "riset bbca"])
+        entry = _last_research_context()
+    assert result.exit_code == 0
+    assert entry is not None and entry.source.startswith("research:"), "jalur riset lama tidak boleh rusak"
+
+
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_natural_followup_uses_context(mock_fetch, mock_llm_core):
+    from app.cli.main import _last_research_context
+    store = _fresh_memory_store()
+    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
+        r1 = runner.invoke(app, ["natural", "analisa bbca"])
+        r2 = runner.invoke(app, ["natural", "vs bri"])
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    assert r1.exit_code == 0 and r2.exit_code == 0
+    assert "BBCA" in called and "BBRI" in called, "follow-up 'vs bri' harus jadi compare BBCA vs BBRI dari konteks analyze"
 
 
 @patch("app.agent.research.chat_completion")

@@ -1,6 +1,7 @@
 import re
 import sys
 import typer
+from loguru import logger
 from app.config.settings import settings
 from app.utils.logging import setup_logging
 from app.agent.core import analyze_with_ai, compare_with_ai, ask_llm
@@ -9,6 +10,7 @@ from app.router.engine import fetch_stock, build_context, run_screening, bulk_sc
 from app.services.stock_list import get_all, search, get_discovered_tickers, resolve_name
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse, parse_full
+from app.cli.coordination import ExecutionContext, resolve_followup, route_intent, split_clauses
 from app.services.validate_universe import run as validate_run, last_validated_days
 from app.services.watchlist import (
     create as wl_create,
@@ -33,7 +35,7 @@ from app.services.watchlist import (
 )
 from app.validation import normalize, validate as validate_symbol
 from app.memory import get_store
-from app.memory.models import MemoryType
+from app.memory.models import MemoryEntry, MemoryType
 from typing import Optional
 
 _p = RichPresenter()
@@ -228,24 +230,43 @@ def stocks(query: Optional[str] = typer.Argument(None, help="Cari kode/nama saha
 @app.command()
 def natural(query: str) -> None:
     result = parse_full(query, get_all())
+    if _try_followup(query, result):
+        return
+    if result.ambiguity.ambiguous and result.ambiguity.reason == "multi_intent":
+        if _orchestrate_clauses(query):
+            return
     if result.ambiguity.ambiguous:
         resolved = _resolve_ambiguity_flow(result)
         if resolved is None:
             return
         natural(_substitute_ticker(query, result.ambiguity.invalid, resolved))
         return
-    intent, params = result.intent, result.params
-    if intent == "analyze":
-        analyze(params.get("ticker", ""))
-    elif intent == "compare":
-        tk = params.get("tickers", "")
-        _run_compare(tk)
-    elif intent == "screen":
-        sector_filter = params.get("sector")
-        _run_screen(sector_filter)
-    elif intent == "research":
-        research(params.get("text", query))
-    elif intent == "help":
+    _run_clause(query)
+
+
+def _run_clause(query: str) -> None:
+    """Route & eksekusi SATU klausa (query tunggal). Koordinasi Phase 2:
+    workflow dipilih dari ParseResult + qualifier; logging confidence."""
+    result = parse_full(query, get_all())
+    ctx = ExecutionContext(query=query, parse_result=result, workflow=route_intent(result, query))
+    logger.info("clause workflow={} confidence={} query={!r}", ctx.workflow, result.confidence, query)
+    if _try_followup(query, result):
+        return
+    if result.ambiguity.ambiguous:
+        resolved = _resolve_ambiguity_flow(result)
+        if resolved is None:
+            return
+        _run_clause(_substitute_ticker(query, result.ambiguity.invalid, resolved))
+        return
+    if ctx.workflow == "analyze":
+        analyze(result.params.get("ticker", ""))
+    elif ctx.workflow == "compare":
+        _run_compare(result.params.get("tickers", ""))
+    elif ctx.workflow == "screen":
+        _run_screen(result.params.get("sector"))
+    elif ctx.workflow == "research":
+        research(result.params.get("text", query))
+    elif ctx.workflow == "help":
         info()
     else:
         resp = ask_llm(query)
@@ -253,6 +274,65 @@ def natural(query: str) -> None:
             console.print(resp)
         else:
             _p.error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'info'")
+
+
+def _orchestrate_clauses(query: str) -> bool:
+    """Multi-klausa (multi-intent): validasi SEMUA klausa dulu, baru eksekusi
+    berurutan. Satu klausa gagal/batal -> klausa lain tetap jalan, status per bagian."""
+    clauses = split_clauses(query)
+    if len(clauses) < 2:
+        return False
+    resolved_queries = []
+    for clause in clauses:
+        result = parse_full(clause, get_all())
+        if result.ambiguity.ambiguous:
+            ticker = _resolve_ambiguity_flow(result)
+            if ticker:
+                resolved_queries.append(_substitute_ticker(clause, result.ambiguity.invalid, ticker))
+            else:
+                resolved_queries.append(None)
+        else:
+            resolved_queries.append(clause)
+    for i, q in enumerate(resolved_queries, 1):
+        console.print(f"\n[bold]— Bagian {i}/{len(resolved_queries)} —[/bold]")
+        if q is None:
+            _p.info("Dibatalkan (klarifikasi).")
+            console.print("[red]❌ Gagal[/red]")
+            continue
+        try:
+            _run_clause(q)
+            console.print("[green]✅ Berhasil[/green]")
+        except Exception:
+            logger.exception("clause gagal: {!r}", q)
+            console.print("[red]❌ Gagal[/red]")
+    return True
+
+
+def _try_followup(query: str, result) -> bool:
+    """Follow-up 1-hop: lengkapi query pendek pakai konteks riset terakhir.
+    CLI ambil memory, helper resolve_followup tetap pure."""
+    last = _last_research_context()
+    if last is None:
+        return False
+    resolved = resolve_followup(query, result, last.content, last.source, get_all())
+    if resolved is None:
+        return False
+    logger.info("followup resolve: {!r} -> {!r}", query, resolved)
+    natural(resolved)
+    return True
+
+
+def _last_research_context() -> MemoryEntry | None:
+    """Entri RESEARCH_FINDING terakhir yang bisa jadi konteks follow-up.
+    Terima semua bentuk source: riset ('research:*'), perbandingan
+    ('compare:*'), dan analyze cepat (source = ticker polos)."""
+    for e in reversed(get_store().get_all()):
+        if e.type != MemoryType.RESEARCH_FINDING or not e.source:
+            continue
+        if e.source.startswith("research:") or e.source.startswith("compare:") \
+                or re.fullmatch(r"[A-Z0-9.]{1,10}", e.source):
+            return e
+    return None
 
 
 def _resolve_ambiguity(candidates: list[str]) -> str | None:
@@ -308,6 +388,11 @@ def _substitute_ticker(query: str, tokens: list[str], chosen: str) -> str:
 @app.command()
 def research(query: str) -> None:
     result = parse_full(query, get_all())
+    if _try_followup(query, result):
+        return
+    if result.ambiguity.ambiguous and result.ambiguity.reason == "multi_intent":
+        if _orchestrate_clauses(query):
+            return
     if result.ambiguity.ambiguous:
         resolved = _resolve_ambiguity_flow(result)
         if resolved is None:
