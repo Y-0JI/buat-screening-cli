@@ -51,7 +51,9 @@ def test_registry_covers_all_commands():
                 "info", "validate-universe"}
     assert {f.key for f in FEATURES} == expected
     interactive = {f.key for f in FEATURES if f.interactive}
-    assert interactive == {"natural", "chat"}
+    assert interactive == {"chat"}
+    chat_features = {f.key for f in FEATURES if f.workspace == "chat"}
+    assert chat_features == {"natural"}
 
 @pytest.mark.asyncio
 async def test_dashboard_shows_all_groups():

@@ -27,6 +27,8 @@ class Feature:
     status: FeatureStatus = FeatureStatus.AVAILABLE
     planned_phase: int | None = None
     keywords: list[str] = field(default_factory=list)
+    hidden: bool = False
+    workspace: str | None = None
 
 
 GROUPS = ["Analysis", "Market", "Research", "Watchlist", "System"]
@@ -59,7 +61,7 @@ FEATURES: list[Feature] = [
     Feature("research", "Riset", "Riset mendalam topik atau saham", "Research",
             ["research", "<QUERY>"], _QUERY, keywords=["riset", "laporan"]),
     Feature("natural", "Query Natural", "Eksekusi query bahasa natural", "Research",
-            ["natural"], interactive=True, status=FeatureStatus.PLANNED, planned_phase=2,
+            ["natural"], workspace="chat",
             keywords=["natural", "kalimat"]),
     Feature("chat", "Diskusi AI", "Sesi diskusi interaktif dengan AI", "Research",
             ["chat"], interactive=True, status=FeatureStatus.PLANNED, planned_phase=2,

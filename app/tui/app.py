@@ -3,6 +3,7 @@ from textual.binding import Binding
 
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import Feature, FeatureStatus, build_command
+from app.tui.screens.chat import ChatScreen
 from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
@@ -23,6 +24,8 @@ class ScreeningApp(App):
     def open_feature(self, feature: Feature) -> None:
         if feature.status == FeatureStatus.PLANNED:
             screen = PlannedScreen(feature)
+        elif feature.workspace == "chat":
+            screen = ChatScreen(feature, self._executor)
         elif any(arg.required for arg in feature.args):
             screen = InputFormScreen(feature)
         else:

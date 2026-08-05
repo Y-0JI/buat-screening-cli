@@ -113,3 +113,48 @@ async def test_watchlist_show_real_run():
         assert "Selesai (exit 0)" in lines, lines
         assert name in lines, lines
         await pilot.press("q")
+
+
+from app.tui.screens.chat import ChatScreen
+from app.tui.registry import FEATURES, FeatureStatus
+
+
+@pytest.mark.asyncio
+async def test_chat_workspace_generic_and_history():
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording))
+        await pilot.pause()
+        prompt = app.screen.query_one("#prompt", Input)
+        prompt.focus()
+        prompt.value = "analisa BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert recording.calls == [["natural", "analisa BBCA"]]
+        assert "> analisa BBCA" in lines
+        assert "done" in lines
+        app.screen.query_one("#prompt", Input).value = "terus gimana?"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert recording.calls == [["natural", "analisa BBCA"], ["natural", "terus gimana?"]]
+        assert lines.count("> ") == 2
+        assert "done" in lines
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+
+
+def test_natural_available_not_planned():
+    natural = next(f for f in FEATURES if f.key == "natural")
+    assert natural.status == FeatureStatus.AVAILABLE
+    assert natural.planned_phase is None
+    assert natural.workspace == "chat"
