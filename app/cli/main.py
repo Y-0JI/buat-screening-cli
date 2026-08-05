@@ -36,7 +36,7 @@ from app.services.watchlist import (
 )
 from app.validation import normalize, validate as validate_symbol
 from app.memory import get_store
-from app.memory.models import MemoryEntry, MemoryType
+from app.memory.models import MemoryType
 from typing import Optional
 
 _p = RichPresenter()
@@ -288,6 +288,8 @@ def _record_turn(ctx: ExecutionContext) -> None:
         tickers = [ctx.parse_result.params["ticker"]]
     elif ctx.workflow == "compare":
         tickers = [t for t in ctx.parse_result.params.get("tickers", "").replace(",", " ").split() if t]
+    elif ctx.workflow == "research":
+        tickers = conversation.extract_tickers(ctx.query, get_all())
     conversation.record(ctx.workflow, tickers, ctx.query)
 
 
@@ -325,7 +327,7 @@ def _orchestrate_clauses(query: str) -> bool:
 
 def _try_followup(query: str, result) -> bool:
     """Follow-up rule-based dari conversation state (satu sumber konteks).
-    CLI ambil state, helper resolve_followup tetap pure."""
+    CLI ambil state, conversation.resolve_followup tetap pure."""
     state = conversation.recent()
     if state is None:
         return False
@@ -335,19 +337,6 @@ def _try_followup(query: str, result) -> bool:
     logger.info("followup resolve: {!r} -> {!r}", query, resolved)
     natural(resolved)
     return True
-
-
-def _last_research_context() -> MemoryEntry | None:
-    """Entri RESEARCH_FINDING terakhir yang bisa jadi konteks follow-up.
-    Terima semua bentuk source: riset ('research:*'), perbandingan
-    ('compare:*'), dan analyze cepat (source = ticker polos)."""
-    for e in reversed(get_store().get_all()):
-        if e.type != MemoryType.RESEARCH_FINDING or not e.source:
-            continue
-        if e.source.startswith("research:") or e.source.startswith("compare:") \
-                or re.fullmatch(r"[A-Z0-9.]{1,10}", e.source):
-            return e
-    return None
 
 
 def _resolve_ambiguity(candidates: list[str]) -> str | None:

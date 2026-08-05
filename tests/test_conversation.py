@@ -124,3 +124,34 @@ def test_chat_resolves_followup_consistently(mock_fetch, mock_llm_core):
     called = [c.args[0] for c in mock_fetch.call_args_list]
     assert result.exit_code == 0
     assert "BBCA" in called and "BBRI" in called, "follow-up di chat ter-resolve konsisten dengan natural"
+
+
+# --- Review PR #202 fixes ---
+
+@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
+def test_research_full_report_records_ticker_and_followup(mock_fetch, mock_llm_core, mock_llm_research):
+    store = _fresh_store()
+    with patch("app.cli.main.get_store", return_value=store), patch("app.cli.conversation.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store), patch("app.agent.research.get_store", return_value=store):
+        r1 = runner.invoke(app, ["natural", "riset bbca"])
+        s = recent()
+        r2 = runner.invoke(app, ["natural", "vs bbri"])
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    assert r1.exit_code == 0 and r2.exit_code == 0
+    assert s is not None and s.tickers == ("BBCA",), "riset penuh harus merekam ticker yang dibahas"
+    assert "BBCA" in called and "BBRI" in called, "follow-up singkat setelah riset penuh harus terbaca"
+
+
+def test_resolve_analyze_other_without_anchor():
+    state = ConversationState(workflow="research", tickers=(), query="riset bank")
+    assert resolve_followup("kalau bbca gimana?", state, None) == "analisa BBCA"
+    assert resolve_followup("gimana dengan bbca?", state, None) == "analisa BBCA"
+
+
+def test_resolve_pronoun_canonicalizes_short_ticker():
+    universe = [{"ticker": "BBCA"}, {"ticker": "BBRI"}]
+    state = ConversationState(workflow="analyze", tickers=("BBCA",), query="analisa bbca")
+    assert resolve_followup("bandingkan dia dengan bri", state, universe) == "bandingkan BBCA dengan BBRI", \
+        "ticker pendek di jalur pronoun harus dikanonikali via universe (bri -> BBRI)"
+    assert resolve_followup("bandingkan itu dengan bri", state, universe) == "bandingkan BBCA dengan BBRI"
