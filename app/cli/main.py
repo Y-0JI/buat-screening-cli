@@ -55,7 +55,7 @@ def _show_health():
 
 
 _KNOWN_COMMANDS = {"analyze", "trend", "score", "compare", "screen", "gainers",
-                   "losers", "sector", "stocks", "natural", "info", "chat", "research", "validate-universe", "watchlist"}
+                   "losers", "sector", "stocks", "natural", "info", "chat", "research", "validate-universe", "watchlist", "tui"}
 
 def _reroute_unknown_to_natural():
     args = [a for a in sys.argv[1:] if not a.startswith("-")]
@@ -481,6 +481,14 @@ def validate_universe(dry_run: bool = typer.Option(False, "--dry-run", help="Han
     """Validasi daftar emiten via Yahoo Finance. Update valid flag."""
     with console.status("[bold blue]Memvalidasi daftar emiten..."):
         validate_run(dry_run=dry_run)
+
+
+@app.command()
+def tui() -> None:
+    """Terminal User Interface (TUI)."""
+    from app.tui.app import main as tui_main
+
+    tui_main()
 
 
 watchlist_cmd = typer.Typer()
