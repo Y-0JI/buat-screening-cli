@@ -159,3 +159,32 @@ async def test_viewer_survives_failed_executor():
         log = app.screen.query_one("#output")
         assert "Gagal menjalankan" in "\n".join(log.lines)
         await pilot.press("q")
+
+
+from app.tui.registry import build_command
+
+
+def _feature(key):
+    return next(f for f in FEATURES if f.key == key)
+
+
+def test_build_command_required_args():
+    assert build_command(_feature("analyze"), {"ticker": "BBCA"}) == ["analyze", "BBCA"]
+    assert build_command(_feature("trend"), {"ticker": "BBCA"}) == ["trend", "BBCA"]
+    assert build_command(_feature("score"), {"ticker": "BBCA"}) == ["score", "BBCA"]
+    assert build_command(_feature("compare"), {"tickers": "BBCA,BBRI"}) == ["compare", "BBCA,BBRI"]
+    assert build_command(_feature("sector"), {"name": "Financials"}) == ["sector", "Financials"]
+    assert build_command(_feature("research"), {"query": "analisa BBCA"}) == ["research", "analisa BBCA"]
+    assert build_command(_feature("watchlist-show"), {"wl_id": "Portofolio"}) == ["watchlist", "show", "Portofolio"]
+
+
+def test_build_command_optional_args():
+    assert build_command(_feature("screen"), {}) == ["screen"]
+    assert build_command(_feature("screen"), {"sector": "Financials"}) == ["screen", "--sector", "Financials"]
+    assert build_command(_feature("stocks"), {}) == ["stocks"]
+    assert build_command(_feature("stocks"), {"query": "bank"}) == ["stocks", "bank"]
+
+
+def test_build_command_missing_required_raises():
+    with pytest.raises(ValueError):
+        build_command(_feature("analyze"), {})

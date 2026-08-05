@@ -12,6 +12,7 @@ class FeatureArg:
     name: str
     placeholder: str
     required: bool
+    option: bool = False
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,6 @@ GROUPS = ["Analysis", "Market", "Research", "Watchlist", "System"]
 
 _TICKER = [FeatureArg("ticker", "<TICKER>", True)]
 _COMPARE = [FeatureArg("tickers", "<TICKER1,TICKER2>", True)]
-_SEKTOR = [FeatureArg("sector", "<SEKTOR>", False)]
 _QUERY = [FeatureArg("query", "<QUERY>", True)]
 
 FEATURES: list[Feature] = [
@@ -45,7 +45,8 @@ FEATURES: list[Feature] = [
     Feature("compare", "Bandingkan", "Bandingkan dua saham", "Analysis",
             ["compare", "<TICKER1,TICKER2>"], _COMPARE, keywords=["banding", "compare"]),
     Feature("screen", "Screening", "Screening saham dengan filter", "Market",
-            ["screen"], _SEKTOR, keywords=["screener", "filter"]),
+            ["screen"], [FeatureArg("sector", "<SEKTOR>", False, option=True)],
+            keywords=["screener", "filter"]),
     Feature("gainers", "Top Gainers", "Saham dengan kenaikan terbesar", "Market",
             ["gainers"], keywords=["gainers", "naik"]),
     Feature("losers", "Top Losers", "Saham dengan penurunan terbesar", "Market",
@@ -64,7 +65,7 @@ FEATURES: list[Feature] = [
             ["chat"], interactive=True, status=FeatureStatus.PLANNED, planned_phase=2,
             keywords=["chat", "tanya"]),
     Feature("watchlist-show", "Watchlist", "Lihat isi watchlist", "Watchlist",
-            ["watchlist", "show"], [FeatureArg("wl_id", "<NAMA_WATCHLIST>", False)],
+            ["watchlist", "show", "<NAMA_WATCHLIST>"], [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
             keywords=["watchlist", "list"]),
     Feature("info", "Info Sistem", "Info sistem dan provider data", "System",
             ["info"], keywords=["info", "sistem"]),
@@ -74,3 +75,33 @@ FEATURES: list[Feature] = [
 
 _keys = [f.key for f in FEATURES]
 assert len(_keys) == len(set(_keys)), f"duplicate feature keys: {_keys}"
+
+
+def build_command(feature: Feature, values: dict[str, str]) -> list[str]:
+    argv: list[str] = []
+    placed: set[str] = set()
+    for token in feature.command:
+        arg = next((a for a in feature.args if token == a.placeholder), None)
+        if arg is None:
+            argv.append(token)
+            continue
+        placed.add(arg.name)
+        val = values.get(arg.name, "")
+        if not val:
+            if arg.required:
+                raise ValueError(f"argumen wajib kosong: {arg.name}")
+            continue
+        argv.append(val)
+    for arg in feature.args:
+        if arg.name in placed:
+            continue
+        val = values.get(arg.name, "")
+        if not val:
+            if arg.required:
+                raise ValueError(f"argumen wajib kosong: {arg.name}")
+            continue
+        if arg.option:
+            argv.extend([f"--{arg.name}", val])
+        else:
+            argv.append(val)
+    return argv
