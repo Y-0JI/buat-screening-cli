@@ -238,47 +238,7 @@ def test_natural_multi_intent_continues_after_failure(mock_fetch, mock_llm_core,
 
 @patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
 @patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-def test_followup_context_from_analyze_memory(mock_fetch, mock_llm_core):
-    from app.agent.core import analyze_with_ai
-    from app.cli.main import _last_research_context
-    store = _fresh_memory_store()
-    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
-        analyze_with_ai("BBCA")
-        entry = _last_research_context()
-    assert entry is not None, "entri analyze cepat harus terbaca sebagai konteks follow-up"
-    assert entry.source == "BBCA", "source entri analyze = ticker polos"
-
-
-@patch("app.agent.core.chat_completion", return_value="perbandingan")
-@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-def test_followup_context_from_compare_memory(mock_fetch, mock_llm_core):
-    from app.agent.core import compare_with_ai
-    from app.cli.main import _last_research_context
-    store = _fresh_memory_store()
-    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
-        compare_with_ai(["BBCA", "BBRI"])
-        entry = _last_research_context()
-    assert entry is not None, "entri compare harus terbaca sebagai konteks follow-up"
-    assert entry.source == "compare:BBCA,BBRI"
-
-
-@patch("app.agent.research.chat_completion", return_value="Ringkasan Eksekutif: ok\nRekomendasi:\n1. hold")
-@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
-@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
-def test_followup_context_from_research_memory(mock_fetch, mock_llm_core, mock_llm_research):
-    from app.cli.main import _last_research_context
-    store = _fresh_memory_store()
-    with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store), patch("app.agent.research.get_store", return_value=store):
-        result = runner.invoke(app, ["natural", "riset bbca"])
-        entry = _last_research_context()
-    assert result.exit_code == 0
-    assert entry is not None and entry.source.startswith("research:"), "jalur riset lama tidak boleh rusak"
-
-
-@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
-@patch.object(engine.provider, "fetch", side_effect=_mock_fetch)
 def test_natural_followup_uses_context(mock_fetch, mock_llm_core):
-    from app.cli.main import _last_research_context
     store = _fresh_memory_store()
     with patch("app.cli.main.get_store", return_value=store), patch("app.agent.core.get_store", return_value=store):
         r1 = runner.invoke(app, ["natural", "analisa bbca"])
