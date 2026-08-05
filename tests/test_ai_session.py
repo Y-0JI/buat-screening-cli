@@ -80,6 +80,23 @@ def test_session_empty_no_memory_entry(mock_fetch):
     assert not any(e.source == "chat" for e in store.get_all()), "sesi kosong tanpa entri memori"
 
 
+@patch("app.agent.core.chat_completion", return_value="BBCA stabil.")
+@patch.object(engine.provider, "fetch", side_effect=lambda t, *a, **k: (
+    (_ for _ in ()).throw(ConnectionError("network down")) if t.upper() == "BBCA" else _mock_fetch(t, *a, **k)
+))
+def test_session_survives_failed_query(mock_fetch, mock_llm_core):
+    store = _fresh_store()
+    p1, p2, p3 = _patch_store(store)
+    with p1, p2, p3, patch("app.cli.main.console.input", side_effect=["analisa bbca", "analisa bbri", "exit"]), \
+         patch("app.cli.main.console.print") as mock_print:
+        _ai_session()
+    called = [c.args[0] for c in mock_fetch.call_args_list]
+    messages = " ".join(str(c.args[0]) for c in mock_print.call_args_list)
+    assert "Gagal" in messages, "query gagal harus menampilkan pesan singkat"
+    assert "BBRI" in called, "sesi harus lanjut ke prompt berikutnya setelah satu query gagal"
+    assert any(e.source == "chat" for e in store.get_all()), "jejak percakapan tetap tersimpan"
+
+
 # --- Smoke: entry TTY via pty (perilaku nyata, bukan CliRunner) ---
 
 def _run_in_pty(script: list[str], timeout: float = 30.0) -> tuple[int, str]:

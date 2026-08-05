@@ -89,13 +89,17 @@ def _ai_session() -> None:
     while True:
         try:
             query = console.input("> ")
-            if query.lower() in ("exit", "quit", "keluar"):
-                break
-            queries.append(query)
-            natural(query)
         except (EOFError, KeyboardInterrupt):
             console.print()
             break
+        if query.lower() in ("exit", "quit", "keluar"):
+            break
+        queries.append(query)
+        try:
+            natural(query)
+        except Exception:
+            logger.exception("query gagal di sesi: {!r}", query)
+            console.print("[red]❌ Gagal diproses. Coba lagi.[/red]")
     if queries:
         tail = " | ".join(q[:200] for q in queries[-6:])
         get_store().add_or_update(MemoryType.IMPORTANT_CONTEXT, f"Percakapan terakhir: {tail}", source="chat")
