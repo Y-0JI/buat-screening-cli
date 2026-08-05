@@ -12,3 +12,4 @@ app/data/ai_memory.json
 *.db
 *.backup
 *.bak
+.worktrees/
