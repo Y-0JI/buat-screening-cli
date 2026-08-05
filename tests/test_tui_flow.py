@@ -158,3 +158,31 @@ def test_natural_available_not_planned():
     assert natural.status == FeatureStatus.AVAILABLE
     assert natural.planned_phase is None
     assert natural.workspace == "chat"
+
+
+def test_watchlist_action_dashboard_hidden_and_commands():
+    from app.tui.registry import build_command as bc
+    hidden_keys = {f.key for f in FEATURES if f.hidden}
+    assert hidden_keys == {"watchlist-add", "watchlist-remove", "watchlist-create", "watchlist-delete"}
+    assert all(f.workspace == "watchlist" for f in FEATURES if f.hidden)
+    create = next(f for f in FEATURES if f.key == "watchlist-create")
+    add = next(f for f in FEATURES if f.key == "watchlist-add")
+    remove = next(f for f in FEATURES if f.key == "watchlist-remove")
+    delete = next(f for f in FEATURES if f.key == "watchlist-delete")
+    assert bc(create, {"wl_id": "Proyek"}) == ["watchlist", "create", "Proyek"]
+    assert bc(add, {"wl_id": "Proyek", "ticker": "BBRI"}) == ["watchlist", "add", "Proyek", "BBRI"]
+    assert bc(remove, {"wl_id": "Proyek", "ticker": "BBRI"}) == ["watchlist", "remove", "Proyek", "BBRI"]
+    assert bc(delete, {"wl_id": "Proyek"}) == ["watchlist", "delete", "Proyek"]
+
+
+@pytest.mark.asyncio
+async def test_hidden_actions_not_in_dashboard():
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        labels = [str(w.render()) for w in app.screen.query("Label")]
+        joined = "\n".join(labels)
+        for title in ("Tambah Simbol", "Buat Watchlist", "Hapus Simbol", "Hapus Watchlist"):
+            assert title not in joined, f"aksi hidden bocor ke dashboard: {title}"
+        await pilot.press("q")
