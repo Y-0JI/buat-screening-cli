@@ -17,7 +17,6 @@ CASES = [
     ("compare", "analysis", 3, {"tickers": "BBCA,BBRI"}, ["compare", "BBCA,BBRI"]),
     ("sector", "market", 3, {"name": "Financials"}, ["sector", "Financials"]),
     ("research", "research", 0, {"query": "analisa BBCA"}, ["research", "analisa BBCA"]),
-    ("watchlist-show", "watchlist", 0, {"wl_id": "Portofolio"}, ["watchlist", "show", "Portofolio"]),
 ]
 
 
@@ -87,31 +86,84 @@ async def test_form_rejects_empty_required():
         await pilot.press("q")
 
 
-@pytest.mark.asyncio
-async def test_watchlist_show_real_run():
-    name = f"TUI-Test-{uuid.uuid4().hex[:6]}"
-    bin_path = shutil.which("screening")
-    created = subprocess.run([bin_path, "watchlist", "create", name], capture_output=True, text=True)
-    assert created.returncode == 0, created.stderr
+from app.tui.screens.watchlist import WatchlistScreen, _WatchlistItem
 
+
+async def _wait_viewer_done(pilot, log, expected: str | None = None):
+    for _ in range(50):
+        await pilot.pause(0.1)
+        if any("Selesai" in line for line in log.lines):
+            break
+    lines = "\n".join(log.lines)
+    assert "Selesai (exit 0)" in lines, lines
+    if expected:
+        assert expected in lines, lines
+    return lines
+
+
+@pytest.mark.asyncio
+async def test_watchlist_workspace_full_e2e():
+    name = f"TUI-Test-{uuid.uuid4().hex[:6]}"
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
         await _select_feature(pilot, "watchlist", 0)
+        assert isinstance(app.screen, WatchlistScreen)
+
+        await pilot.press("n")
+        await pilot.pause()
         assert isinstance(app.screen, InputFormScreen)
         app.screen.query_one("#input-wl_id", Input).value = name
         await pilot.press("enter")
         await pilot.pause()
-        screen = app.screen
-        assert isinstance(screen, CommandViewerScreen)
-        log = screen.query_one("#output")
-        for _ in range(50):
-            await pilot.pause(0.1)
-            if any("Selesai" in line for line in log.lines):
-                break
-        lines = "\n".join(log.lines)
-        assert "Selesai (exit 0)" in lines, lines
-        assert name in lines, lines
+        await _wait_viewer_done(pilot, app.screen.query_one("#output"))
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, WatchlistScreen)
+        assert name in "\n".join(str(w.render()) for w in app.screen.query("#wl-list Label"))
+
+        await pilot.press("a")
+        await pilot.pause()
+        assert isinstance(app.screen, InputFormScreen)
+        app.screen.query_one("#input-wl_id", Input).value = name
+        app.screen.query_one("#input-ticker", Input).value = "BBRI"
+        await pilot.press("enter")
+        await pilot.pause()
+        await _wait_viewer_done(pilot, app.screen.query_one("#output"))
+        await pilot.press("escape")
+        await pilot.pause()
+
+        lv = app.screen.query_one("#wl-list")
+        idx = next(i for i, c in enumerate(lv.children)
+                   if isinstance(c, _WatchlistItem) and c.wl_name == name)
+        lv.index = idx
+        await pilot.press("enter")
+        await pilot.pause()
+        await _wait_viewer_done(pilot, app.screen.query_one("#output"), expected=name)
+        await pilot.press("escape")
+        await pilot.pause()
+
+        await pilot.press("r")
+        await pilot.pause()
+        app.screen.query_one("#input-wl_id", Input).value = name
+        app.screen.query_one("#input-ticker", Input).value = "BBRI"
+        await pilot.press("enter")
+        await pilot.pause()
+        await _wait_viewer_done(pilot, app.screen.query_one("#output"))
+        await pilot.press("escape")
+        await pilot.pause()
+
+        await pilot.press("d")
+        await pilot.pause()
+        app.screen.query_one("#input-wl_id", Input).value = name
+        await pilot.press("enter")
+        await pilot.pause()
+        await _wait_viewer_done(pilot, app.screen.query_one("#output"))
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, WatchlistScreen)
+        labels = "\n".join(str(w.render()) for w in app.screen.query("#wl-list Label"))
+        assert name not in labels, "watchlist tidak terhapus"
         await pilot.press("q")
 
 
@@ -164,7 +216,8 @@ def test_watchlist_action_dashboard_hidden_and_commands():
     from app.tui.registry import build_command as bc
     hidden_keys = {f.key for f in FEATURES if f.hidden}
     assert hidden_keys == {"watchlist-add", "watchlist-remove", "watchlist-create", "watchlist-delete"}
-    assert all(f.workspace == "watchlist" for f in FEATURES if f.hidden)
+    show = next(f for f in FEATURES if f.key == "watchlist-show")
+    assert show.workspace == "watchlist"
     create = next(f for f in FEATURES if f.key == "watchlist-create")
     add = next(f for f in FEATURES if f.key == "watchlist-add")
     remove = next(f for f in FEATURES if f.key == "watchlist-remove")
