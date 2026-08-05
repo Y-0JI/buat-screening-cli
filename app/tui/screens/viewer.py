@@ -30,8 +30,13 @@ class CommandViewerScreen(Screen):
 
     @work(exclusive=True)
     async def _stream(self) -> None:
-        proc = self._executor.run(self._feature)
         log = self.query_one(Log)
+        try:
+            proc = self._executor.run(self._feature)
+        except Exception as exc:
+            log.write_line(f"✗ Gagal menjalankan: {exc}")
+            self._exit_code = 1
+            return
         for line in proc.stdout:
             log.write_line(line.rstrip("\n"))
         for line in proc.stderr:

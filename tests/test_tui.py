@@ -117,3 +117,45 @@ async def test_planned_feature_shows_phase():
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_full_navigation_flow():
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, CommandViewerScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        research_list = app.screen.query_one("#list-research")
+        research_list.focus()
+        await pilot.press("down", "down", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PlannedScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+    assert app.return_code == 0
+
+
+@pytest.mark.asyncio
+async def test_viewer_survives_failed_executor():
+    feature = next(f for f in FEATURES if f.key == "info")
+
+    class _BrokenExecutor:
+        def run(self, feature):
+            raise FileNotFoundError("screening")
+
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(CommandViewerScreen(feature, _BrokenExecutor()))
+        await pilot.pause()
+        log = app.screen.query_one("#output")
+        assert "Gagal menjalankan" in "\n".join(log.lines)
+        await pilot.press("q")

@@ -60,9 +60,33 @@ screening natural "analisa BBCA"
 screening natural "bandingkan BBCA dan BBRI"
 screening natural "cari saham breakout"
 
+# Terminal User Interface (TUI)
+screening tui
+
 # Help
 screening info
 ```
+
+## Terminal User Interface (TUI)
+
+`tui` membuka dashboard interaktif untuk menelusuri semua fitur platform:
+
+```bash
+screening tui
+```
+
+Navigasi keyboard:
+
+| Tombol | Fungsi |
+|--------|--------|
+| `↑` / `↓` | Pilih fitur |
+| `Enter` | Buka fitur |
+| `Esc` / `b` | Kembali ke dashboard |
+| `q` | Keluar |
+
+Fitur yang belum tersedia (contoh: `chat`, `natural`) ditampilkan dengan
+badge fase, misal `[Phase 2]`, dan akan aktif seiring roadmap TUI. CLI tetap
+menjadi sumber kebenaran — TUI menjalankan perintah CLI yang sama.
 
 ## Commands
 
@@ -78,6 +102,7 @@ screening info
 | `sector <name>` | Screening by sector |
 | `stocks [query]` | List/search stocks |
 | `natural "<query>"` | Natural language query |
+| `tui` | Terminal User Interface |
 | `info` | Help |
 
 ## Test
@@ -91,6 +116,7 @@ python -m pytest tests/ -v
 ```
 app/
   cli/          CLI entrypoint & formatter
+  tui/          Terminal User Interface (Textual)
   agent/        AI agent (intent, summarization)
   parser/       Intent parsing
   router/       Tool orchestration
