@@ -7,6 +7,11 @@ cukup ticker aktif + workflow + query inti untuk follow-up berikutnya.
 
 Resolver rule-based untuk pola jelas; di luar pola -> None (alur normal yang
 memutuskan). Bukan parser kedua, tanpa interpretasi bebas.
+
+Reset (clear) sengaja tidak disediakan: state di-replace tiap aksi sukses,
+absen entri = kosong, dan akhir sesi chat mempertahankan state untuk
+kontinuitas. Tambahkan clear() via store.forget bila alur reset eksplisit
+dibutuhkan (keputusan desain, bukan fitur terlupakan).
 """
 
 import re

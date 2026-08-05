@@ -5,7 +5,7 @@
 **Goal:** Percakapan multi-turn konsisten di seluruh aplikasi. Satu **Conversation State** jadi satu-satunya sumber konteks follow-up — dipakai `natural` dan `chat`, tanpa sumber konteks lain. Lapisan baru, tidak merombak Phase 1/2.
 
 **Global Constraints:**
-- **Conversation State = satu abstraksi** — API `record`/`recent`/`clear`; detail penyimpanan (rolling `IMPORTANT_CONTEXT`) internal, tidak bocor ke pemanggil.
+- **Conversation State = satu abstraksi** — API `record`/`recent`; detail penyimpanan (rolling `IMPORTANT_CONTEXT`) internal, tidak bocor ke pemanggil.
 - **Simpan minimum** — hanya info yang dibutuhkan follow-up berikutnya (ticker aktif, workflow, query inti). Bukan hasil analisis, bukan riwayat percakapan. Tiap aksi sukses menggantikan state sebelumnya; state selalu = konteks saat ini, bukan gabungan percakapan.
 - **Resolver rule-based** — hanya pola eksplisit, deterministik; bukan parser kedua, tanpa interpretasi bebas. Pola tak cocok → `None`, alur normal yang memutuskan.
 - **Netral** — state tidak tahu pemanggil (natural/chat). Tak ada flag mode, tak ada perilaku beda per entry point.
@@ -24,6 +24,8 @@
 - Satu entri rolling `IMPORTANT_CONTEXT` (source `conversation`) berisi konteks percakapan saat ini (ticker aktif, workflow, query inti). Di-overwrite tiap aksi sukses — bukan satu entri per turn, bukan riwayat penuh.
 - API `record` (tulis/timpa, dipanggil hanya dari jalur sukses), `recent` (baca konteks saat ini). I/O internal lewat `get_store()`.
 - Abstraksi netral: pemanggil hanya pakai API; natural & chat identik. State tidak menyimpan hasil analisis, tidak tahu pemanggil.
+
+**Catatan (keputusan desain):** mekanisme reset (`clear`) sengaja TIDAK disediakan di Phase 3 — tidak ada alur yang memerlukannya. State selalu di-replace tiap aksi sukses (`add_or_update`, source `conversation`); absennya entri = state kosong; akhir sesi chat mempertahankan state demi kontinuitas antar sesi. Bila fase berikutnya butuh reset eksplisit (misal perintah "mulai ulang diskusi"), tambahkan via `store.forget` pada entri source `conversation` — bukan fitur terlupakan, keputusan ditunda sampai ada kebutuhan nyata.
 
 **Kriteria selesai:**
 - Aksi sukses → entri rolling ter-update; invocation berikutnya (natural) / turn berikutnya (chat) membaca konteks yang sama.
