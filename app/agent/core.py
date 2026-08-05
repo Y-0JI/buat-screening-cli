@@ -29,8 +29,9 @@ def _render_template(template: str, **kwargs) -> str:
 
 def _build_system_prompt(ticker: str = "") -> str:
     system_prompt = _load_prompt("system.md")
+    guideline = _load_prompt("response_guideline.md")
     memory_block = get_store().serialize_for_prompt(ticker=ticker)
-    return system_prompt.replace("{{MEMORY}}", memory_block)
+    return system_prompt.replace("{{MEMORY}}", guideline + "\n\n" + memory_block)
 
 
 def _render_caveats(caveats: list[str]) -> str:
