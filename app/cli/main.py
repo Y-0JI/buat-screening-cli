@@ -10,7 +10,8 @@ from app.router.engine import fetch_stock, build_context, run_screening, bulk_sc
 from app.services.stock_list import get_all, search, get_discovered_tickers, resolve_name
 from app.presenters.rich_presenter import console, RichPresenter
 from app.parser.intent import INTENT_UNKNOWN, INTENT_RESEARCH, parse, parse_full
-from app.cli.coordination import ExecutionContext, resolve_followup, route_intent, split_clauses
+from app.cli.coordination import ExecutionContext, route_intent, split_clauses
+from app.cli import conversation
 from app.services.validate_universe import run as validate_run, last_validated_days
 from app.services.watchlist import (
     create as wl_create,
@@ -260,12 +261,16 @@ def _run_clause(query: str) -> None:
         return
     if ctx.workflow == "analyze":
         analyze(result.params.get("ticker", ""))
+        _record_turn(ctx)
     elif ctx.workflow == "compare":
         _run_compare(result.params.get("tickers", ""))
+        _record_turn(ctx)
     elif ctx.workflow == "screen":
         _run_screen(result.params.get("sector"))
+        _record_turn(ctx)
     elif ctx.workflow == "research":
         research(result.params.get("text", query))
+        _record_turn(ctx)
     elif ctx.workflow == "help":
         info()
     else:
@@ -274,6 +279,16 @@ def _run_clause(query: str) -> None:
             console.print(resp)
         else:
             _p.error("Query tidak dikenali. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'info'")
+
+def _record_turn(ctx: ExecutionContext) -> None:
+    """Rekam konteks percakapan setelah aksi berhasil (di jalur sukses saja).
+    Minimal: ticker aktif + workflow + query inti. State menggantikan yang lama."""
+    tickers = []
+    if ctx.workflow == "analyze" and ctx.parse_result.params.get("ticker"):
+        tickers = [ctx.parse_result.params["ticker"]]
+    elif ctx.workflow == "compare":
+        tickers = [t for t in ctx.parse_result.params.get("tickers", "").replace(",", " ").split() if t]
+    conversation.record(ctx.workflow, tickers, ctx.query)
 
 
 def _orchestrate_clauses(query: str) -> bool:
@@ -309,12 +324,12 @@ def _orchestrate_clauses(query: str) -> bool:
 
 
 def _try_followup(query: str, result) -> bool:
-    """Follow-up 1-hop: lengkapi query pendek pakai konteks riset terakhir.
-    CLI ambil memory, helper resolve_followup tetap pure."""
-    last = _last_research_context()
-    if last is None:
+    """Follow-up rule-based dari conversation state (satu sumber konteks).
+    CLI ambil state, helper resolve_followup tetap pure."""
+    state = conversation.recent()
+    if state is None:
         return False
-    resolved = resolve_followup(query, result, last.content, last.source, get_all())
+    resolved = conversation.resolve_followup(query, state, get_all())
     if resolved is None:
         return False
     logger.info("followup resolve: {!r} -> {!r}", query, resolved)
@@ -418,6 +433,12 @@ def chat() -> None:
             query = console.input("[bold cyan]>> [/bold cyan]")
             if query.lower() in ("exit", "quit", "keluar"):
                 break
+            resolved = conversation.resolve_followup(query, conversation.recent(), get_all())
+            if resolved is not None and resolved != query.strip():
+                _run_clause(resolved)
+                messages.append({"role": "user", "content": query})
+                messages.append({"role": "assistant", "content": f"(Dieksekusi sebagai: {resolved})"})
+                continue
             resp = ask_llm(query, messages=messages)
             if resp:
                 console.print(resp)
