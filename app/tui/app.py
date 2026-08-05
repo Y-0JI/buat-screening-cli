@@ -3,8 +3,10 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Static
 
+from app.tui.executor import SubprocessExecutor
 from app.tui.registry import Feature, FeatureStatus
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.viewer import CommandViewerScreen
 
 
 class _FeatureNote(Screen):
@@ -21,6 +23,10 @@ class ScreeningApp(App):
     TITLE = "Screening AI — TUI"
     BINDINGS = [Binding("q", "quit_app", "Keluar")]
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._executor = SubprocessExecutor()
+
     def on_mount(self) -> None:
         self.push_screen(DashboardScreen())
 
@@ -28,7 +34,7 @@ class ScreeningApp(App):
         if feature.status == FeatureStatus.PLANNED:
             screen = _FeatureNote(feature, "Tersedia di Phase 2")
         else:
-            screen = _FeatureNote(feature, "Eksekusi fitur — dibangun Task 3")
+            screen = CommandViewerScreen(feature, self._executor)
         self.push_screen(screen)
 
     def action_quit_app(self) -> None:

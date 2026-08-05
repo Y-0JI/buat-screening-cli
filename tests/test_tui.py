@@ -1,8 +1,22 @@
+import subprocess
+
 import pytest
 
 from app.tui.app import ScreeningApp, main
+from app.tui.executor import SubprocessExecutor
 from app.tui.registry import FEATURES, GROUPS, FeatureStatus
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.viewer import CommandViewerScreen
+
+
+class _EchoExecutor:
+    def run(self, feature):
+        return subprocess.Popen(
+            ["echo", "hello"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
 @pytest.mark.asyncio
 async def test_app_boots_and_quits():
@@ -44,4 +58,42 @@ async def test_dashboard_shows_all_groups():
         assert isinstance(app.screen, DashboardScreen)
         for group in GROUPS:
             assert app.screen.query_one(f"#list-{group.lower()}")
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_open_available_feature():
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, CommandViewerScreen)
+        await pilot.press("q")
+
+
+def test_subprocess_executor_runs_info():
+    feature = next(f for f in FEATURES if f.key == "info")
+    proc = SubprocessExecutor().run(feature)
+    out, _ = proc.communicate(timeout=60)
+    assert proc.returncode == 0
+    assert out.strip()
+
+@pytest.mark.asyncio
+async def test_viewer_streams_output_and_back():
+    feature = next(f for f in FEATURES if f.key == "info")
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(CommandViewerScreen(feature, _EchoExecutor()))
+        await pilot.pause()
+        await pilot.pause()
+        screen = app.screen
+        assert isinstance(screen, CommandViewerScreen)
+        log = screen.query_one("#output")
+        assert "hello" in "\n".join(log.lines)
+        assert "exit 0" in "\n".join(log.lines)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
         await pilot.press("q")
