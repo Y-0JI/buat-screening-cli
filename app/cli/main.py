@@ -64,12 +64,41 @@ def _reroute_unknown_to_natural():
 
 _reroute_unknown_to_natural()
 
-app = typer.Typer()
+app = typer.Typer(no_args_is_help=False)
 
 
-@app.callback()
-def main() -> None:
+@app.callback(invoke_without_command=True)
+def main(ctx: typer.Context) -> None:
     setup_logging(settings.log_level)
+    if len(sys.argv) == 1 and sys.stdin.isatty():
+        _ai_session()
+        raise typer.Exit()
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(0)
+
+
+def _ai_session() -> None:
+    """Sesi AI-first (Phase 5): lapisan entry saja. Tiap input diproses lewat
+    pipeline natural yang sudah ada (follow-up, routing, ambiguity, fallback
+    LLM) — tanpa logika routing baru. Keluar menyimpan jejak pertanyaan ke
+    memori (pola chat tail), kontinuitas antar sesi lewat conversation state."""
+    console.print("[bold]Screening AI — Investment Research Workspace[/bold]")
+    console.print("[dim]Ketik 'exit' untuk keluar, 'info' untuk bantuan.[/dim]")
+    queries: list[str] = []
+    while True:
+        try:
+            query = console.input("> ")
+            if query.lower() in ("exit", "quit", "keluar"):
+                break
+            queries.append(query)
+            natural(query)
+        except (EOFError, KeyboardInterrupt):
+            console.print()
+            break
+    if queries:
+        tail = " | ".join(q[:200] for q in queries[-6:])
+        get_store().add_or_update(MemoryType.IMPORTANT_CONTEXT, f"Percakapan terakhir: {tail}", source="chat")
 
 
 @app.command()
