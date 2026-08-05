@@ -6,17 +6,8 @@ from textual.widgets import Static
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import Feature, FeatureStatus
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.viewer import CommandViewerScreen
-
-
-class _FeatureNote(Screen):
-    def __init__(self, feature: Feature, message: str) -> None:
-        super().__init__()
-        self._feature = feature
-        self._message = message
-
-    def compose(self):
-        yield Static(f"[bold]{self._feature.title}[/]\n\n{self._message}\n\n[dim]esc: kembali[/dim]")
 
 
 class ScreeningApp(App):
@@ -32,7 +23,7 @@ class ScreeningApp(App):
 
     def open_feature(self, feature: Feature) -> None:
         if feature.status == FeatureStatus.PLANNED:
-            screen = _FeatureNote(feature, "Tersedia di Phase 2")
+            screen = PlannedScreen(feature)
         else:
             screen = CommandViewerScreen(feature, self._executor)
         self.push_screen(screen)

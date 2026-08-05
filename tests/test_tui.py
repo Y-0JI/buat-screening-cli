@@ -6,7 +6,9 @@ from app.tui.app import ScreeningApp, main
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import FEATURES, GROUPS, FeatureStatus
 from app.tui.screens.dashboard import DashboardScreen
+from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.viewer import CommandViewerScreen
+from textual.widgets import Static
 
 
 class _EchoExecutor:
@@ -93,6 +95,24 @@ async def test_viewer_streams_output_and_back():
         log = screen.query_one("#output")
         assert "hello" in "\n".join(log.lines)
         assert "exit 0" in "\n".join(log.lines)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_planned_feature_shows_phase():
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        research_list = app.screen.query_one("#list-research")
+        research_list.focus()
+        await pilot.press("down", "down", "enter")
+        await pilot.pause()
+        assert isinstance(app.screen, PlannedScreen)
+        text = str(app.screen.query_one(Static).render())
+        assert "Phase 2" in text
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
