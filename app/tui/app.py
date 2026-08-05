@@ -1,7 +1,5 @@
 from textual.app import App
 from textual.binding import Binding
-from textual.screen import Screen
-from textual.widgets import Static
 
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import Feature, FeatureStatus

@@ -18,7 +18,6 @@ class CommandViewerScreen(Screen):
         super().__init__()
         self._feature = feature
         self._executor = executor
-        self._exit_code: int | None = None
 
     def compose(self) -> ComposeResult:
         yield Log(highlight=False, id="output")
@@ -35,17 +34,16 @@ class CommandViewerScreen(Screen):
             proc = self._executor.run(self._feature)
         except Exception as exc:
             log.write_line(f"✗ Gagal menjalankan: {exc}")
-            self._exit_code = 1
             return
         for line in proc.stdout:
             log.write_line(line.rstrip("\n"))
         for line in proc.stderr:
             log.write_line(line.rstrip("\n"))
-        self._exit_code = proc.wait()
-        if self._exit_code == 0:
-            log.write_line(f"✓ Selesai (exit {self._exit_code})")
+        exit_code = proc.wait()
+        if exit_code == 0:
+            log.write_line(f"✓ Selesai (exit {exit_code})")
         else:
-            log.write_line(f"✗ Gagal (exit {self._exit_code})")
+            log.write_line(f"✗ Gagal (exit {exit_code})")
 
     def action_back(self) -> None:
         self.app.pop_screen()
