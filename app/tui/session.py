@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from loguru import logger
+
 _PATH = Path(__file__).resolve().parent.parent / "data" / "tui_session.json"
 _MAX_LINES = 200
 
@@ -19,5 +21,5 @@ def load_history() -> list[str]:
 def save_history(lines) -> None:
     try:
         _PATH.write_text(json.dumps({"chat_history": list(lines)[-_MAX_LINES:]}, ensure_ascii=False), encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as exc:
+        logger.warning("gagal menyimpan riwayat chat: {}", exc)

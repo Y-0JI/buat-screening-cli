@@ -19,6 +19,7 @@ class ChatScreen(Screen):
         super().__init__()
         self._feature = feature
         self._executor = executor
+        self._lines: list[str] = []
 
     def compose(self) -> ComposeResult:
         yield Log(highlight=False, id="history")
@@ -26,11 +27,15 @@ class ChatScreen(Screen):
         yield Input(placeholder="Tulis pesan...", id="prompt")
         yield Footer()
 
+    def _write(self, line: str) -> None:
+        self._lines.append(line)
+        self.query_one(Log).write_line(line)
+
     def on_mount(self) -> None:
-        log = self.query_one(Log)
-        log.write_line(f"{self._feature.title} — {self._feature.description}")
-        for line in load_history():
-            log.write_line(line)
+        self._lines = load_history()
+        self._write(f"{self._feature.title} — {self._feature.description}")
+        for line in self._lines:
+            self.query_one(Log).write_line(line)
         self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -38,30 +43,33 @@ class ChatScreen(Screen):
         if not query:
             return
         event.input.value = ""
-        self.query_one(Log).write_line(f"> {query}")
+        self._write(f"> {query}")
+        self.query_one("#status", Label).update("Memproses...")
         self._send(query)
 
     @work(group="chat", exclusive=True)
     async def _send(self, query: str) -> None:
-        log = self.query_one(Log)
         argv = self._feature.command + [query]
         try:
             proc = self._executor.run(argv)
         except Exception as exc:
-            log.write_line(f"✗ Gagal menjalankan: {exc}")
-            log.write_line("")
+            self._write(f"✗ Gagal menjalankan: {exc}")
+            self._write("")
+            self.query_one("#status", Label).update("")
             return
         try:
-            exit_code = await stream_process(proc, log.write_line)
+            exit_code = await stream_process(proc, self._write)
         finally:
             terminate_process(proc)
         if exit_code == 0:
-            log.write_line(f"✓ Selesai (exit {exit_code})")
+            self._write(f"✓ Selesai (exit {exit_code})")
         else:
-            log.write_line(f"✗ Gagal (exit {exit_code})")
-        log.write_line("")
+            self._write(f"✗ Gagal (exit {exit_code})")
+        self._write("")
         self.query_one("#status", Label).update("")
 
+    def on_unmount(self) -> None:
+        save_history(self._lines)
+
     def action_back(self) -> None:
-        save_history(self.query_one(Log).lines)
         self.app.pop_screen()

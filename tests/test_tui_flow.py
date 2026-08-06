@@ -586,3 +586,42 @@ async def test_chat_session_history_persists(tmp_path, monkeypatch):
         assert "> analisa BBCA" in lines, "riwayat tidak restore"
         assert lines.count("> analisa BBCA") == 1, "riwayat dobel"
         await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_chat_saves_history_on_quit_direct(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording))
+        await pilot.pause()
+        prompt = app.screen.query_one("#prompt", Input)
+        prompt.value = "analisa BBRI"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("q")
+    data = session_mod.load_history()
+    assert any("> analisa BBRI" in line for line in data), f"riwayat hilang saat quit: {data}"
+
+
+def test_save_history_gagal_mencatat_warning(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    from loguru import logger
+
+    captured: list[str] = []
+    sink_id = logger.add(lambda msg: captured.append(str(msg)))
+    try:
+        blocker = tmp_path / "blocker.txt"
+        blocker.write_text("x")
+        monkeypatch.setattr(session_mod, "_PATH", blocker / "sub" / "x.json")
+        session_mod.save_history(["baris"])
+    finally:
+        logger.remove(sink_id)
+    assert any("riwayat" in m for m in captured), f"warning tidak tercatat: {captured}"
