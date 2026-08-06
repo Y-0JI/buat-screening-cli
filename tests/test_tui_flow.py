@@ -171,11 +171,13 @@ async def test_watchlist_workspace_full_e2e():
 
 
 from app.tui.screens.chat import ChatScreen
-from app.tui.registry import FEATURES, FeatureStatus
+from app.tui.registry import FEATURES, GROUPS, FeatureStatus
 
 
 @pytest.mark.asyncio
-async def test_chat_workspace_generic_and_history():
+async def test_chat_workspace_generic_and_history(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
     feature = next(f for f in FEATURES if f.key == "natural")
     app = ScreeningApp()
     recording = _RecordingExecutor()
@@ -258,7 +260,9 @@ class _SlowExecutor:
 
 
 @pytest.mark.asyncio
-async def test_chat_rapid_fire_cancels_previous():
+async def test_chat_rapid_fire_cancels_previous(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
     feature = next(f for f in FEATURES if f.key == "natural")
     app = ScreeningApp()
     slow = _SlowExecutor()
@@ -486,4 +490,99 @@ async def test_result_table_union_columns():
         cols = {c.label.plain for c in table.columns.values()}
         assert cols == {"a", "b", "c"}, f"kolom hilang: {cols}"
         assert table.row_count == 2
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_search_filters_and_opens():
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        search = app.screen.query_one("#search", Input)
+        search.focus()
+        search.value = "bank"
+        await pilot.pause()
+        total_items = sum(len(lv.children) for g in GROUPS
+                          for lv in [app.screen.query_one(f"#list-{g.lower()}")])
+        assert total_items == 0, f"search 'bank' masih menampilkan {total_items} item"
+        search.value = "gainers"
+        await pilot.pause()
+        items = [it.feature.key for lv in app.screen.query("ListView")
+                 for it in lv.children if hasattr(it, "feature")]
+        assert items == ["gainers"], f"hasil salah: {items}"
+        await pilot.press("enter")
+        await pilot.pause()
+        from app.tui.screens.table import ResultTableScreen
+        assert isinstance(app.screen, ResultTableScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_dashboard_shortcuts_and_help():
+    from app.tui.screens.help import HelpScreen
+    from app.tui.screens.input import InputFormScreen
+
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("a")
+        await pilot.pause()
+        assert isinstance(app.screen, InputFormScreen), "shortcut a tidak buka form analisis"
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("?")
+        await pilot.pause()
+        assert isinstance(app.screen, HelpScreen)
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("]")
+        await pilot.pause()
+        assert app.focused.id == "list-market", f"group pindah salah: {app.focused.id}"
+        await pilot.press("[")
+        await pilot.pause()
+        assert app.focused.id == "list-analysis"
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_shortcuts_single_source():
+    from app.tui.shortcuts import SHORTCUTS, help_lines
+    assert "a" in SHORTCUTS
+    lines = dict(help_lines()[1:1 + len(SHORTCUTS)])
+    assert set(lines) == set(SHORTCUTS.keys()), "help tidak setara dengan SHORTCUTS"
+    keys = [b.key for b in DashboardScreen.BINDINGS]
+    for k in SHORTCUTS:
+        assert k in keys, f"shortcut {k} tidak terdaftar di dashboard"
+
+
+@pytest.mark.asyncio
+async def test_chat_session_history_persists(tmp_path, monkeypatch):
+    from app.tui.session import _PATH, save_history
+    monkeypatch.setattr("app.tui.session._PATH", tmp_path / "tui_session.json")
+
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording))
+        await pilot.pause()
+        prompt = app.screen.query_one("#prompt", Input)
+        prompt.value = "analisa BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        # buka lagi -> riwayat tampil
+        await app.push_screen(ChatScreen(feature, recording))
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert "> analisa BBCA" in lines, "riwayat tidak restore"
+        assert lines.count("> analisa BBCA") == 1, "riwayat dobel"
         await pilot.press("q")

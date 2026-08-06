@@ -6,6 +6,7 @@ from textual.widgets import Footer, Input, Label, Log
 
 from app.tui.executor import Executor, stream_process, terminate_process
 from app.tui.registry import Feature
+from app.tui.session import load_history, save_history
 
 
 class ChatScreen(Screen):
@@ -26,7 +27,10 @@ class ChatScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one(Log).write_line(f"{self._feature.title} — {self._feature.description}")
+        log = self.query_one(Log)
+        log.write_line(f"{self._feature.title} — {self._feature.description}")
+        for line in load_history():
+            log.write_line(line)
         self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -59,4 +63,5 @@ class ChatScreen(Screen):
         self.query_one("#status", Label).update("")
 
     def action_back(self) -> None:
+        save_history(self.query_one(Log).lines)
         self.app.pop_screen()

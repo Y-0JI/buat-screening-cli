@@ -13,3 +13,4 @@ app/data/ai_memory.json
 *.backup
 *.bak
 .worktrees/
+app/data/tui_session.json
