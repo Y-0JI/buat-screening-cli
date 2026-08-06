@@ -2,7 +2,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Footer, Input, Log
+from textual.widgets import Footer, Input, Label, Log
 
 from app.tui.executor import Executor, stream_process
 from app.tui.registry import Feature
@@ -22,6 +22,7 @@ class ChatScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Log(highlight=False, id="history")
+        yield Label("", id="status")
         yield Input(placeholder="Tulis pesan...", id="prompt")
         yield Footer()
 
@@ -56,6 +57,7 @@ class ChatScreen(Screen):
         else:
             log.write_line(f"✗ Gagal (exit {exit_code})")
         log.write_line("")
+        self.query_one("#status", Label).update("")
 
     def action_back(self) -> None:
         self.app.pop_screen()

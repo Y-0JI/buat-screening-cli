@@ -7,6 +7,8 @@ from app.tui.screens.chat import ChatScreen
 from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
+from app.tui.screens.report import ReportViewerScreen
+from app.tui.screens.table import ResultTableScreen
 from app.tui.screens.viewer import CommandViewerScreen
 from app.tui.screens.watchlist import WatchlistScreen
 
@@ -22,6 +24,13 @@ class ScreeningApp(App):
     def on_mount(self) -> None:
         self.push_screen(DashboardScreen())
 
+    def _result_screen(self, feature: Feature, argv: list[str]):
+        if feature.view == "table":
+            return ResultTableScreen(feature, argv, self._executor)
+        if feature.view == "report":
+            return ReportViewerScreen(feature, argv, self._executor)
+        return CommandViewerScreen(feature, argv, self._executor)
+
     def open_feature(self, feature: Feature, initial: dict[str, str] | None = None) -> None:
         if feature.status == FeatureStatus.PLANNED:
             screen = PlannedScreen(feature)
@@ -32,17 +41,17 @@ class ScreeningApp(App):
         elif any(arg.required for arg in feature.args):
             screen = InputFormScreen(feature, initial)
         else:
-            screen = CommandViewerScreen(feature, feature.command, self._executor)
+            screen = self._result_screen(feature, feature.command)
         self.push_screen(screen)
 
     def submit_feature(self, feature: Feature, values: dict[str, str]) -> None:
         argv = build_command(feature, values)
         self.pop_screen()
-        self.push_screen(CommandViewerScreen(feature, argv, self._executor))
+        self.push_screen(self._result_screen(feature, argv))
 
     def open_feature_direct(self, feature: Feature, values: dict[str, str]) -> None:
         argv = build_command(feature, values)
-        self.push_screen(CommandViewerScreen(feature, argv, self._executor))
+        self.push_screen(self._result_screen(feature, argv))
 
     def open_feature_key(self, key: str) -> None:
         feature = next(f for f in FEATURES if f.key == key)

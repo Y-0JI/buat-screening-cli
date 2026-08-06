@@ -29,6 +29,7 @@ class Feature:
     keywords: list[str] = field(default_factory=list)
     hidden: bool = False
     workspace: str | None = None
+    view: str = "viewer"
 
 
 GROUPS = ["Analysis", "Market", "Research", "Watchlist", "System"]
@@ -48,18 +49,18 @@ FEATURES: list[Feature] = [
             ["compare", "<TICKER1,TICKER2>"], _COMPARE, keywords=["banding", "compare"]),
     Feature("screen", "Screening", "Screening saham dengan filter", "Market",
             ["screen"], [FeatureArg("sector", "<SEKTOR>", False, option=True)],
-            keywords=["screener", "filter"]),
+            keywords=["screener", "filter"], view="table"),
     Feature("gainers", "Top Gainers", "Saham dengan kenaikan terbesar", "Market",
-            ["gainers"], keywords=["gainers", "naik"]),
+            ["gainers"], keywords=["gainers", "naik"], view="table"),
     Feature("losers", "Top Losers", "Saham dengan penurunan terbesar", "Market",
-            ["losers"], keywords=["losers", "turun"]),
+            ["losers"], keywords=["losers", "turun"], view="table"),
     Feature("sector", "Per Sektor", "Performa saham per sektor", "Market",
             ["sector", "<NAMA_SEKTOR>"], [FeatureArg("name", "<NAMA_SEKTOR>", True)],
             keywords=["sektor", "industri"]),
     Feature("stocks", "Cari Saham", "Cari kode atau nama saham", "Market",
-            ["stocks"], [FeatureArg("query", "<QUERY>", False)], keywords=["cari", "kode"]),
+            ["stocks"], [FeatureArg("query", "<QUERY>", False)], keywords=["cari", "kode"], view="table"),
     Feature("research", "Riset", "Riset mendalam topik atau saham", "Research",
-            ["research", "<QUERY>"], _QUERY, keywords=["riset", "laporan"]),
+            ["research", "<QUERY>"], _QUERY, keywords=["riset", "laporan"], view="report"),
     Feature("natural", "Query Natural", "Eksekusi query bahasa natural", "Research",
             ["natural"], workspace="chat",
             keywords=["natural", "kalimat"]),
@@ -68,7 +69,7 @@ FEATURES: list[Feature] = [
             keywords=["chat", "tanya"]),
     Feature("watchlist-show", "Watchlist", "Kelola watchlist", "Watchlist",
             ["watchlist", "show", "<NAMA_WATCHLIST>"], [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
-            workspace="watchlist", keywords=["watchlist", "list"]),
+            workspace="watchlist", keywords=["watchlist", "list"], view="table"),
     Feature("watchlist-add", "Tambah Simbol", "Tambah simbol ke watchlist", "Watchlist",
             ["watchlist", "add", "<NAMA_WATCHLIST>", "<TICKER>"],
             [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True), FeatureArg("ticker", "<TICKER>", True)],
@@ -86,7 +87,7 @@ FEATURES: list[Feature] = [
             [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
             hidden=True),
     Feature("info", "Info Sistem", "Info sistem dan provider data", "System",
-            ["info"], keywords=["info", "sistem"]),
+            ["info"], keywords=["info", "sistem"], view="table"),
     Feature("validate-universe", "Validasi Universe", "Validasi daftar emiten", "System",
             ["validate-universe"], keywords=["validasi", "emiten"]),
 ]
