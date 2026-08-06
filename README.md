@@ -119,6 +119,15 @@ chat, tabel, laporan).
 Data terstruktur berasal dari output `--json` CLI (kontrak stabil) — CLI tetap
 sumber kebenaran, TUI hanya merender.
 
+### Productivity
+
+- **Cari fitur**: tekan `/`, ketik (title/keyword), `Enter` jalankan hasil teratas.
+- **Shortcut dashboard**: `a` Analisis, `s` Screening, `g` Gainers, `l` Losers,
+  `w` Watchlist, `r` Riset, `n` Query Natural, `i` Info; `[`/`]` ganti grup.
+- **Bantuan**: `?` menampilkan semua shortcut (satu sumber).
+- **Sesi chat berkelanjutan**: riwayat percakapan AI tersimpan otomatis dan
+  ditampilkan ulang saat Query Natural dibuka lagi.
+
 Fitur yang belum tersedia ditampilkan dengan badge fase (contoh: `[Phase 2]`)
 dan akan aktif seiring roadmap TUI. CLI tetap menjadi sumber kebenaran —
 TUI menjalankan perintah CLI yang sama.
