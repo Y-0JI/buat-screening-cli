@@ -105,6 +105,20 @@ simbol; daftar otomatis segar setelah setiap perubahan.
 | `d` | Hapus watchlist |
 | `Esc` / `b` | Kembali |
 
+### Rich Data Presentation
+
+Fitur data menampilkan hasil sebagai **tabel** (bukan teks mentah):
+Screening, Top Gainers/Losers, Cari Saham, isi Watchlist, dan Info Sistem.
+Riset mendalam dibuka di **Laporan Riset**: ringkasan eksekutif, rekomendasi,
+dan setiap section data (fundamental, keuangan, valuasi, teknikal, risiko...)
+dengan badge status ketersediaan.
+
+Saat proses berjalan muncul indikator "Memproses..." di semua layar (viewer,
+chat, tabel, laporan).
+
+Data terstruktur berasal dari output `--json` CLI (kontrak stabil) — CLI tetap
+sumber kebenaran, TUI hanya merender.
+
 Fitur yang belum tersedia ditampilkan dengan badge fase (contoh: `[Phase 2]`)
 dan akan aktif seiring roadmap TUI. CLI tetap menjadi sumber kebenaran —
 TUI menjalankan perintah CLI yang sama.

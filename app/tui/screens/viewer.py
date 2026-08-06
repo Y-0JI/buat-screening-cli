@@ -1,23 +1,11 @@
-import subprocess
-
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Footer, Log
+from textual.widgets import Footer, Label, Log
 
-from app.tui.executor import Executor, stream_process
+from app.tui.executor import Executor, stream_process, terminate_process
 from app.tui.registry import Feature
-
-
-def _terminate_proc(proc: subprocess.Popen) -> None:
-    if proc.poll() is None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
 
 
 class CommandViewerScreen(Screen):
@@ -34,6 +22,7 @@ class CommandViewerScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Log(highlight=False, id="output")
+        yield Label("Memproses...", id="status")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -51,7 +40,8 @@ class CommandViewerScreen(Screen):
         try:
             exit_code = await stream_process(proc, log.write_line)
         finally:
-            _terminate_proc(proc)
+            terminate_process(proc)
+        self.query_one("#status", Label).update("")
         if exit_code == 0:
             log.write_line(f"✓ Selesai (exit {exit_code})")
         else:

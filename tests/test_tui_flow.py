@@ -1,9 +1,10 @@
+import json
 import shutil
 import subprocess
 import uuid
 
 import pytest
-from textual.widgets import Input
+from textual.widgets import DataTable, Input
 
 from app.tui.app import ScreeningApp
 from app.tui.screens.dashboard import DashboardScreen
@@ -16,7 +17,7 @@ CASES = [
     ("score", "analysis", 2, {"ticker": "BBCA"}, ["score", "BBCA"]),
     ("compare", "analysis", 3, {"tickers": "BBCA,BBRI"}, ["compare", "BBCA,BBRI"]),
     ("sector", "market", 3, {"name": "Financials"}, ["sector", "Financials"]),
-    ("research", "research", 0, {"query": "analisa BBCA"}, ["research", "analisa BBCA"]),
+    ("research", "research", 0, {"query": "analisa BBCA"}, ["research", "analisa BBCA", "--json"]),
 ]
 
 
@@ -59,12 +60,11 @@ async def test_all_required_arg_features_build_final_command():
             await pilot.pause()
             await pilot.pause()
             screen = app.screen
-            assert isinstance(screen, CommandViewerScreen), f"{key}: viewer tidak muncul"
+            from app.tui.screens.report import ReportViewerScreen
+            expected_type = ReportViewerScreen if key == "research" else CommandViewerScreen
+            assert isinstance(screen, expected_type), f"{key}: screen salah {type(screen).__name__}"
             assert recording.calls[-1] == expected, f"{key}: argv salah {recording.calls[-1]}"
-            log = screen.query_one("#output")
-            lines = "\n".join(log.lines)
-            assert f"$ screening {' '.join(expected)}" in lines, f"{key}: command display salah"
-            assert "<" not in lines, f"{key}: masih ada placeholder"
+            assert "<" not in json.dumps(recording.calls[-1]), f"{key}: masih ada placeholder"
             await pilot.press("escape")
             await pilot.pause()
             assert isinstance(app.screen, DashboardScreen), f"{key}: tidak kembali ke dashboard"
@@ -87,6 +87,7 @@ async def test_form_rejects_empty_required():
 
 
 from app.tui.screens.watchlist import WatchlistScreen, _WatchlistItem
+from app.tui.screens.table import ResultTableScreen
 
 
 async def _wait_viewer_done(pilot, log, expected: str | None = None):
@@ -139,7 +140,9 @@ async def test_watchlist_workspace_full_e2e():
         lv.index = idx
         await pilot.press("enter")
         await pilot.pause()
-        await _wait_viewer_done(pilot, app.screen.query_one("#output"), expected=name)
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
         await pilot.press("escape")
         await pilot.pause()
 
@@ -309,4 +312,178 @@ async def test_watchlist_add_prefills_selected_name():
         await pilot.press("enter")
         await pilot.pause()
         assert recording.calls[-1] == ["watchlist", "add", name, "BBCA"]
+        await pilot.press("q")
+
+
+class _JsonExecutor:
+    def __init__(self, payload):
+        self.payload = payload
+        self.calls = []
+
+    def run(self, argv):
+        self.calls.append(list(argv))
+        code = f"print(__import__('json').dumps({self.payload!r}))"
+        return subprocess.Popen(["python", "-c", code], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+@pytest.mark.asyncio
+async def test_result_table_renders_rows():
+    from app.tui.screens.table import ResultTableScreen
+
+    app = ScreeningApp()
+    exec = _JsonExecutor({"results": [{"ticker": "BBCA", "nama": "Bank"}, {"ticker": "BBRI", "nama": "Rakyat"}]})
+    app._executor = exec
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "market", 0)
+        assert isinstance(app.screen, ResultTableScreen)
+        await pilot.pause()
+        await pilot.pause()
+        table = app.screen.query_one(DataTable)
+        assert exec.calls == [["screen", "--json"]]
+        assert table.row_count == 2
+        cols = {c.label.plain for c in table.columns.values()}
+        assert cols == {"ticker", "nama"}
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_result_table_invalid_json_stays_stable():
+    from app.tui.screens.table import ResultTableScreen
+
+    app = ScreeningApp()
+    app._executor = _JsonExecutor("bukan json")
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "market", 0)
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        table = app.screen.query_one(DataTable)
+        assert table.row_count == 1
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_report_viewer_renders_sections():
+    from app.tui.screens.report import ReportViewerScreen
+
+    payload = {
+        "intent": {"type": "single_stock", "raw_query": "analisa BBCA"},
+        "executive_summary": "Ringkasan singkat",
+        "recommendations": ["Beli BBCA"],
+        "sections": {
+            "fundamental": {"status": "available", "data": {"roe": "15%", "debt": {"ratio": "1.2"}}},
+            "risk": {"status": "missing", "reason": "tidak ada data"},
+        },
+        "failed": [],
+        "ai_failed": False,
+    }
+    app = ScreeningApp()
+    app._executor = _JsonExecutor(payload)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "research", 0)
+        assert isinstance(app.screen, InputFormScreen)
+        app.screen.query_one("#input-query", Input).value = "analisa BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ReportViewerScreen)
+        header = str(app.screen.query_one("#report-header").render())
+        assert "analisa BBCA" in header
+        table = app.screen.query_one(DataTable)
+        assert table.row_count >= 4
+        col_keys = list(table.columns.keys())
+        keys = "|".join(str(table.get_cell(rk, ck)) for rk in table.rows for ck in col_keys)
+        for token in ("## Fundamental", "## Risiko", "Ringkasan Eksekutif", "## Rekomendasi"):
+            assert token in keys, f"missing {token}"
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+
+
+class _SleepExecutor:
+    def run(self, argv):
+        return subprocess.Popen(["sh", "-c", "sleep 0.5; echo done"],
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+@pytest.mark.asyncio
+async def test_progress_indicator_shows_and_clears():
+    feature = next(f for f in FEATURES if f.key == "info")
+    app = ScreeningApp()
+    app._executor = _SleepExecutor()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(CommandViewerScreen(feature, ["info"], app._executor))
+        await pilot.pause(0.2)
+        status = app.screen.query_one("#status")
+        assert "Memproses" in str(status.render()), "status tidak tampil saat berjalan"
+        for _ in range(20):
+            await pilot.pause(0.2)
+            if not str(app.screen.query_one("#status").render()).strip():
+                break
+        assert not str(app.screen.query_one("#status").render()).strip(), "status tidak hilang setelah selesai"
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_cancel_mid_process_terminates_fast():
+    from app.tui.screens.table import ResultTableScreen
+    from app.tui.screens.report import ReportViewerScreen
+    import time
+
+    class _SleepAllExecutor:
+        def __init__(self):
+            self.procs = []
+
+        def run(self, argv):
+            p = subprocess.Popen(["sleep", "30"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.procs.append(p)
+            return p
+
+    feature_info = next(f for f in FEATURES if f.key == "info")
+    feature_research = next(f for f in FEATURES if f.key == "research")
+    for feature, screen_cls in ((feature_info, ResultTableScreen), (feature_research, ReportViewerScreen)):
+        app = ScreeningApp()
+        slow = _SleepAllExecutor()
+        app._executor = slow
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.push_screen(screen_cls(feature, ["info"], slow))
+            await pilot.pause()
+            start = time.monotonic()
+            await pilot.press("escape")
+            await pilot.pause()
+            elapsed = time.monotonic() - start
+            p1 = slow.procs[0]
+            assert p1.poll() is not None, f"{screen_cls.__name__}: proses tidak di-terminate"
+            assert elapsed < 5.0, f"{screen_cls.__name__}: cancel lambat {elapsed:.1f}s"
+            await pilot.press("q")
+        if p1.poll() is None:
+            p1.kill()
+            p1.wait()
+
+
+@pytest.mark.asyncio
+async def test_result_table_union_columns():
+    from app.tui.screens.table import ResultTableScreen
+
+    app = ScreeningApp()
+    app._executor = _JsonExecutor({"results": [{"a": "1", "b": "2"}, {"a": "3", "b": "4", "c": "5"}]})
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "market", 0)
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        table = app.screen.query_one(DataTable)
+        cols = {c.label.plain for c in table.columns.values()}
+        assert cols == {"a", "b", "c"}, f"kolom hilang: {cols}"
+        assert table.row_count == 2
         await pilot.press("q")

@@ -34,6 +34,17 @@ async def stream_process(proc: subprocess.Popen, write_line) -> int:
     return proc.wait()
 
 
+def terminate_process(proc: subprocess.Popen) -> None:
+    """Hentikan proses yang masih jalan: terminate -> wait -> kill -> wait (anti-zombie)."""
+    if proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+
 async def _drain(stream, write_line) -> None:
     while True:
         line = await asyncio.to_thread(stream.readline)
