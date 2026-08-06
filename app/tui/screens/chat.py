@@ -4,8 +4,9 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer, Input, Log
 
-from app.tui.executor import Executor
+from app.tui.executor import Executor, stream_process
 from app.tui.registry import Feature
+from app.tui.screens.viewer import _terminate_proc
 
 
 class ChatScreen(Screen):
@@ -25,7 +26,7 @@ class ChatScreen(Screen):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one(Log).write_line(f"[bold]{self._feature.title}[/] — {self._feature.description}")
+        self.query_one(Log).write_line(f"{self._feature.title} — {self._feature.description}")
         self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -33,12 +34,12 @@ class ChatScreen(Screen):
         if not query:
             return
         event.input.value = ""
-        log = self.query_one(Log)
-        log.write_line(f"> {query}")
-        self._send(query, log)
+        self.query_one(Log).write_line(f"> {query}")
+        self._send(query)
 
-    @work(exclusive=True)
-    async def _send(self, query: str, log: Log) -> None:
+    @work(group="chat", exclusive=True)
+    async def _send(self, query: str) -> None:
+        log = self.query_one(Log)
         argv = self._feature.command + [query]
         try:
             proc = self._executor.run(argv)
@@ -46,11 +47,10 @@ class ChatScreen(Screen):
             log.write_line(f"✗ Gagal menjalankan: {exc}")
             log.write_line("")
             return
-        for line in proc.stdout:
-            log.write_line(line.rstrip("\n"))
-        for line in proc.stderr:
-            log.write_line(line.rstrip("\n"))
-        exit_code = proc.wait()
+        try:
+            exit_code = await stream_process(proc, log.write_line)
+        finally:
+            _terminate_proc(proc)
         if exit_code == 0:
             log.write_line(f"✓ Selesai (exit {exit_code})")
         else:

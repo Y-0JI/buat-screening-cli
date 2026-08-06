@@ -58,28 +58,27 @@ class WatchlistScreen(Screen):
     def _selected_name(self) -> str | None:
         lv = self.query_one("#wl-list", ListView)
         item = lv.highlighted_child
-        if isinstance(item, _WatchlistItem):
+        if isinstance(item, _WatchlistItem) and item.wl_name != "Belum ada watchlist":
             return item.wl_name
         return None
 
-    def open_watchlist(self) -> None:
+    def _open_action(self, key: str) -> None:
+        feature = next(f for f in FEATURES if f.key == key)
         name = self._selected_name()
-        if not name:
-            return
-        feature = next(f for f in FEATURES if f.key == "watchlist-show")
-        self.app.open_feature_direct(feature, {"wl_id": name})
+        initial = {"wl_id": name} if name else None
+        self.app.open_feature(feature, initial)
 
     def action_add(self) -> None:
-        self.app.open_feature_key("watchlist-add")
+        self._open_action("watchlist-add")
 
     def action_remove(self) -> None:
-        self.app.open_feature_key("watchlist-remove")
+        self._open_action("watchlist-remove")
 
     def action_create(self) -> None:
         self.app.open_feature_key("watchlist-create")
 
     def action_delete(self) -> None:
-        self.app.open_feature_key("watchlist-delete")
+        self._open_action("watchlist-delete")
 
     def action_back(self) -> None:
         self.app.pop_screen()

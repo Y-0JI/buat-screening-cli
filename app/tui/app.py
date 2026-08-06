@@ -22,7 +22,7 @@ class ScreeningApp(App):
     def on_mount(self) -> None:
         self.push_screen(DashboardScreen())
 
-    def open_feature(self, feature: Feature) -> None:
+    def open_feature(self, feature: Feature, initial: dict[str, str] | None = None) -> None:
         if feature.status == FeatureStatus.PLANNED:
             screen = PlannedScreen(feature)
         elif feature.workspace == "chat":
@@ -30,7 +30,7 @@ class ScreeningApp(App):
         elif feature.workspace == "watchlist":
             screen = WatchlistScreen()
         elif any(arg.required for arg in feature.args):
-            screen = InputFormScreen(feature)
+            screen = InputFormScreen(feature, initial)
         else:
             screen = CommandViewerScreen(feature, feature.command, self._executor)
         self.push_screen(screen)

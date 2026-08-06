@@ -239,3 +239,74 @@ async def test_hidden_actions_not_in_dashboard():
         for title in ("Tambah Simbol", "Buat Watchlist", "Hapus Simbol", "Hapus Watchlist"):
             assert title not in joined, f"aksi hidden bocor ke dashboard: {title}"
         await pilot.press("q")
+
+
+class _SlowExecutor:
+    def __init__(self):
+        self.procs = []
+
+    def run(self, argv):
+        if argv == ["natural", "lambat"]:
+            p = subprocess.Popen(["sleep", "30"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        else:
+            p = subprocess.Popen(["echo", "done"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        self.procs.append((argv, p))
+        return p
+
+
+@pytest.mark.asyncio
+async def test_chat_rapid_fire_cancels_previous():
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    slow = _SlowExecutor()
+    app._executor = slow
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, slow))
+        await pilot.pause()
+        prompt = app.screen.query_one("#prompt", Input)
+        prompt.value = "lambat"
+        await pilot.press("enter")
+        await pilot.pause()
+        prompt.value = "cepat"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        p1 = slow.procs[0][1]
+        assert p1.poll() is not None, "proses pertama tidak di-terminate"
+        assert slow.procs[1][0] == ["natural", "cepat"]
+        assert "> lambat" in lines and "> cepat" in lines
+        assert "Selesai (exit 0)" in lines
+        await pilot.press("q")
+    if p1.poll() is None:
+        p1.kill()
+        p1.wait()
+
+
+@pytest.mark.asyncio
+async def test_watchlist_add_prefills_selected_name():
+    name = f"TUI-Prefill-{uuid.uuid4().hex[:6]}"
+    bin_path = shutil.which("screening")
+    subprocess.run([bin_path, "watchlist", "create", name], capture_output=True, text=True, check=True)
+
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "watchlist", 0)
+        lv = app.screen.query_one("#wl-list")
+        idx = next(i for i, c in enumerate(lv.children)
+                   if isinstance(c, _WatchlistItem) and c.wl_name == name)
+        lv.index = idx
+        await pilot.press("a")
+        await pilot.pause()
+        assert isinstance(app.screen, InputFormScreen)
+        wl_input = app.screen.query_one("#input-wl_id", Input)
+        assert wl_input.value == name, f"prefill salah: {wl_input.value!r}"
+        app.screen.query_one("#input-ticker", Input).value = "BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert recording.calls[-1] == ["watchlist", "add", name, "BBCA"]
+        await pilot.press("q")
