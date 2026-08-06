@@ -7,7 +7,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Label, Static
 
-from app.tui.executor import Executor
+from app.tui.executor import Executor, terminate_process
 from app.tui.registry import Feature
 
 
@@ -38,7 +38,10 @@ class ResultTableScreen(Screen):
     async def _load(self) -> None:
         self.query_one("#progress", Label).update("Memproses...")
         proc = self._executor.run(self._argv + ["--json"])
-        out, _err = await asyncio.to_thread(proc.communicate)
+        try:
+            out, _err = await asyncio.to_thread(proc.communicate)
+        finally:
+            terminate_process(proc)
         exit_code = proc.wait()
         self.query_one("#progress", Label).update("")
         if exit_code != 0 or not out.strip():
@@ -58,11 +61,17 @@ class ResultTableScreen(Screen):
             table.add_column("Hasil")
             table.add_row("Tidak ada data")
             return
-        keys = list(rows[0].keys())
-        for k in keys:
+        cols: list[str] = []
+        seen: set[str] = set()
+        for row in rows:
+            for k in row.keys():
+                if k not in seen:
+                    seen.add(k)
+                    cols.append(k)
+        for k in cols:
             table.add_column(str(k))
         for row in rows:
-            table.add_row(*[str(row.get(k, "")) for k in keys])
+            table.add_row(*[str(row.get(k, "")) for k in cols])
 
     def _render_data(self, data: dict) -> None:
         if "providers" in data:

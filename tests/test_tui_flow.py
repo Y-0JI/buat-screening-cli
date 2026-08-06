@@ -430,3 +430,60 @@ async def test_progress_indicator_shows_and_clears():
                 break
         assert not str(app.screen.query_one("#status").render()).strip(), "status tidak hilang setelah selesai"
         await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_cancel_mid_process_terminates_fast():
+    from app.tui.screens.table import ResultTableScreen
+    from app.tui.screens.report import ReportViewerScreen
+    import time
+
+    class _SleepAllExecutor:
+        def __init__(self):
+            self.procs = []
+
+        def run(self, argv):
+            p = subprocess.Popen(["sleep", "30"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.procs.append(p)
+            return p
+
+    feature_info = next(f for f in FEATURES if f.key == "info")
+    feature_research = next(f for f in FEATURES if f.key == "research")
+    for feature, screen_cls in ((feature_info, ResultTableScreen), (feature_research, ReportViewerScreen)):
+        app = ScreeningApp()
+        slow = _SleepAllExecutor()
+        app._executor = slow
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            await app.push_screen(screen_cls(feature, ["info"], slow))
+            await pilot.pause()
+            start = time.monotonic()
+            await pilot.press("escape")
+            await pilot.pause()
+            elapsed = time.monotonic() - start
+            p1 = slow.procs[0]
+            assert p1.poll() is not None, f"{screen_cls.__name__}: proses tidak di-terminate"
+            assert elapsed < 5.0, f"{screen_cls.__name__}: cancel lambat {elapsed:.1f}s"
+            await pilot.press("q")
+        if p1.poll() is None:
+            p1.kill()
+            p1.wait()
+
+
+@pytest.mark.asyncio
+async def test_result_table_union_columns():
+    from app.tui.screens.table import ResultTableScreen
+
+    app = ScreeningApp()
+    app._executor = _JsonExecutor({"results": [{"a": "1", "b": "2"}, {"a": "3", "b": "4", "c": "5"}]})
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "market", 0)
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        table = app.screen.query_one(DataTable)
+        cols = {c.label.plain for c in table.columns.values()}
+        assert cols == {"a", "b", "c"}, f"kolom hilang: {cols}"
+        assert table.row_count == 2
+        await pilot.press("q")

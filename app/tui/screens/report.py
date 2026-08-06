@@ -7,7 +7,7 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import DataTable, Footer, Label, Static
 
-from app.tui.executor import Executor
+from app.tui.executor import Executor, terminate_process
 from app.tui.registry import Feature
 
 _SECTION_LABELS = {
@@ -64,7 +64,10 @@ class ReportViewerScreen(Screen):
     @work(exclusive=True)
     async def _load(self) -> None:
         proc = self._executor.run(self._argv + ["--json"])
-        out, _err = await asyncio.to_thread(proc.communicate)
+        try:
+            out, _err = await asyncio.to_thread(proc.communicate)
+        finally:
+            terminate_process(proc)
         proc.wait()
         self.query_one("#status", Label).update("")
         header = self.query_one("#report-header", Static)

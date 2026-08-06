@@ -4,9 +4,8 @@ from textual.binding import Binding
 from textual.screen import Screen
 from textual.widgets import Footer, Input, Label, Log
 
-from app.tui.executor import Executor, stream_process
+from app.tui.executor import Executor, stream_process, terminate_process
 from app.tui.registry import Feature
-from app.tui.screens.viewer import _terminate_proc
 
 
 class ChatScreen(Screen):
@@ -51,7 +50,7 @@ class ChatScreen(Screen):
         try:
             exit_code = await stream_process(proc, log.write_line)
         finally:
-            _terminate_proc(proc)
+            terminate_process(proc)
         if exit_code == 0:
             log.write_line(f"✓ Selesai (exit {exit_code})")
         else:
