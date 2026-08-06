@@ -625,3 +625,24 @@ def test_save_history_gagal_mencatat_warning(tmp_path, monkeypatch):
     finally:
         logger.remove(sink_id)
     assert any("riwayat" in m for m in captured), f"warning tidak tercatat: {captured}"
+
+
+@pytest.mark.asyncio
+async def test_chat_header_once_with_existing_history(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    session_mod.save_history(["> analisa BBCA", "hasil lama"])
+    feature = next(f for f in FEATURES if f.key == "natural")
+    header = f"{feature.title} — {feature.description}"
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording))
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert lines.count(header) == 1, f"header dobel: {lines}"
+        assert "> analisa BBCA" in lines and "hasil lama" in lines
+        await pilot.press("q")

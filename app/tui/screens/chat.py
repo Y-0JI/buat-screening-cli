@@ -33,9 +33,9 @@ class ChatScreen(Screen):
 
     def on_mount(self) -> None:
         self._lines = load_history()
-        self._write(f"{self._feature.title} — {self._feature.description}")
         for line in self._lines:
             self.query_one(Log).write_line(line)
+        self._write(f"{self._feature.title} — {self._feature.description}")
         self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
