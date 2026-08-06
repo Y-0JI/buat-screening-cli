@@ -35,6 +35,7 @@ from app.services.watchlist import (
     resolve_id as wl_resolve,
 )
 from app.validation import normalize, validate as validate_symbol
+from app.cli import json_output as jo
 from app.memory import get_store
 from app.memory.models import MemoryType
 from typing import Optional
@@ -182,23 +183,27 @@ def _run_compare(tickers_str: str) -> None:
 def screen(
     sector: Optional[str] = typer.Option(None, "--sector", "-s", help="Filter sektor"),
     limit: int = typer.Option(10, "--limit", "-n", help="Jumlah maksimal hasil"),
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
 ) -> None:
-    _run_screen(sector, limit)
+    _run_screen(sector, limit, json_output=json)
 
 
-def _run_screen(sector: Optional[str], limit: int = 10) -> None:
+def _run_screen(sector: Optional[str], limit: int = 10, json_output: bool = False) -> None:
     _warn_universe_age()
     symbols = get_discovered_tickers()
     if sector:
         symbols = [s for s in symbols if s.sector and sector.lower() in s.sector.lower()]
-    if not symbols:
-        _p.info(f"Tidak ada saham {'di sektor ' + sector if sector else ''}")
-        return
     tickers = [s.ticker for s in symbols]
     with console.status(f"[bold blue]Screening saham..."):
         results, invalid, failed = bulk_screen(tickers)
     if limit:
         results = results[:limit]
+    if json_output:
+        print(jo.dump({"results": results, "invalid": invalid, "failed": failed}))
+        return
+    if not symbols:
+        _p.info(f"Tidak ada saham {'di sektor ' + sector if sector else ''}")
+        return
     if not results:
         _p.info("Tidak ada sinyal screening ditemukan")
         if invalid:
@@ -211,21 +216,33 @@ def _run_screen(sector: Optional[str], limit: int = 10) -> None:
 
 
 @app.command()
-def gainers(limit: int = 10) -> None:
+def gainers(
+    limit: int = 10,
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
+) -> None:
     _warn_universe_age()
     tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_gainers(tickers)
+    if json:
+        print(jo.dump({"results": results[:limit], "invalid": invalid, "failed": failed}))
+        return
     _print_bulk_change(results[:limit], title="Top Gainers", invalid=invalid, failed=failed)
     _show_health()
 
 
 @app.command()
-def losers(limit: int = 10) -> None:
+def losers(
+    limit: int = 10,
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
+) -> None:
     _warn_universe_age()
     tickers = [s.ticker for s in get_discovered_tickers()]
     with console.status(f"[bold blue]Mengambil harga {len(tickers)} saham..."):
         results, invalid, failed = bulk_losers(tickers)
+    if json:
+        print(jo.dump({"results": results[:limit], "invalid": invalid, "failed": failed}))
+        return
     _print_bulk_change(results[:limit], title="Top Losers", invalid=invalid, failed=failed)
     _show_health()
 
@@ -252,8 +269,15 @@ def sector(name: str = typer.Argument(help="Nama sektor, contoh: Financials")) -
 
 
 @app.command()
-def stocks(query: Optional[str] = typer.Argument(None, help="Cari kode/nama saham")) -> None:
+def stocks(
+    query: Optional[str] = typer.Argument(None, help="Cari kode/nama saham"),
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
+) -> None:
     all_stocks = search(query) if query else get_all()
+    if json:
+        keys = ("ticker", "name", "sector", "valid")
+        print(jo.dump({"results": [{k: s.get(k) for k in keys} for s in all_stocks]}))
+        return
     console.print(f"[bold]Total: {len(all_stocks)} saham[/bold]")
     for s in all_stocks[:30]:
         console.print(f"  [cyan]{s['ticker']}[/cyan] - {s['name']}")
@@ -423,7 +447,10 @@ def _substitute_ticker(query: str, tokens: list[str], chosen: str) -> str:
 
 
 @app.command()
-def research(query: str) -> None:
+def research(
+    query: str,
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
+) -> None:
     result = parse_full(query, get_all())
     if _try_followup(query, result):
         return
@@ -438,11 +465,21 @@ def research(query: str) -> None:
     with console.status(f"[bold blue]Menjalankan riset untuk: {query}..."):
         report = run_research(query)
     if report.intent.type == "unsupported":
+        if json:
+            print(jo.dump({"intent": {"type": "unsupported"}, "executive_summary": "", "recommendations": [],
+                           "screening_results": [], "sections": {}, "data_quality": {}, "failed": [query], "ai_failed": False}))
+            return
         _p.info("Query ini bukan permintaan riset. Coba: 'analisa BBCA', 'bandingkan BBCA dan BBRI', 'cari saham breakout'")
         return
     if report.failed and not report.analyses and not report.screening_results:
+        if json:
+            print(jo.dump(jo.research_report(report)))
+            return
         _p.error(f"Data tidak ditemukan: {', '.join(report.failed)}")
         raise typer.Exit(1)
+    if json:
+        print(jo.dump(jo.research_report(report)))
+        return
     _p.research_report(report)
 
 
@@ -582,6 +619,7 @@ def show(
     valid: bool = typer.Option(None, "--valid", "--aktif", help="Filter status aktif"),
     sort: str = typer.Option("", "--sort", help="Urutkan (ticker/name/sector/added_at)"),
     reverse: bool = typer.Option(False, "--reverse", "-r", help="Urutan terbalik"),
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
 ) -> None:
     """Tampilkan isi watchlist dengan opsi cari, filter, urut."""
     try:
@@ -592,6 +630,9 @@ def show(
             w = wl_get(wl_id)
     except ValueError as e:
         console.print(f"[red]✗[/red] {e}")
+        return
+    if json:
+        print(jo.dump({"watchlist": w}))
         return
     fav = "[yellow]★[/yellow]" if w.favorite else ""
     console.print(f"[bold]Watchlist:[/bold] {w.name} {fav}")
@@ -731,7 +772,11 @@ def sync(
 
 
 @app.command()
-def info() -> None:
+def info(json: bool = typer.Option(False, "--json", help="Output JSON terstruktur")) -> None:
+    if json:
+        from app.router.engine import provider as _provider
+        print(jo.dump({"providers": jo.providers_info(_provider)}))
+        return
     console.print("[bold]Available commands:[/bold]")
     console.print("  analyze [ticker]     - Analisa saham (AI)")
     console.print("  trend [ticker]       - Trend teknikal saham")
