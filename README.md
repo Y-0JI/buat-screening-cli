@@ -84,9 +84,30 @@ Navigasi keyboard:
 | `Esc` / `b` | Kembali ke dashboard |
 | `q` | Keluar |
 
-Fitur yang belum tersedia (contoh: `chat`, `natural`) ditampilkan dengan
-badge fase, misal `[Phase 2]`, dan akan aktif seiring roadmap TUI. CLI tetap
-menjadi sumber kebenaran — TUI menjalankan perintah CLI yang sama.
+### AI Agent Workspace
+
+Pilih **Query Natural** di grup Research untuk sesi percakapan dengan AI.
+Ketik query bahasa natural lalu `Enter`; jawaban dan hasil eksekusi tampil
+dalam satu riwayat. Konteks percakapan (follow-up seperti "terus gimana?")
+tetap berlanjut selama workspace aktif.
+
+### Watchlist Workspace
+
+Pilih **Watchlist** di grup Watchlist. Daftar watchlist tampil dengan jumlah
+simbol; daftar otomatis segar setelah setiap perubahan.
+
+| Tombol | Fungsi |
+|--------|--------|
+| `Enter` | Lihat isi watchlist terpilih |
+| `a` | Tambah simbol |
+| `r` | Hapus simbol |
+| `n` | Buat watchlist baru |
+| `d` | Hapus watchlist |
+| `Esc` / `b` | Kembali |
+
+Fitur yang belum tersedia ditampilkan dengan badge fase (contoh: `[Phase 2]`)
+dan akan aktif seiring roadmap TUI. CLI tetap menjadi sumber kebenaran —
+TUI menjalankan perintah CLI yang sama.
 
 ## Commands
 

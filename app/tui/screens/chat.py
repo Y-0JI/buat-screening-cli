@@ -1,52 +1,51 @@
-import subprocess
-
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.screen import Screen
-from textual.widgets import Footer, Log
+from textual.widgets import Footer, Input, Log
 
 from app.tui.executor import Executor, stream_process
 from app.tui.registry import Feature
+from app.tui.screens.viewer import _terminate_proc
 
 
-def _terminate_proc(proc: subprocess.Popen) -> None:
-    if proc.poll() is None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=2)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait()
-
-
-class CommandViewerScreen(Screen):
+class ChatScreen(Screen):
     BINDINGS = [
         Binding("escape", "back", "Kembali"),
         Binding("b", "back", "Kembali"),
     ]
 
-    def __init__(self, feature: Feature, argv: list[str], executor: Executor) -> None:
+    def __init__(self, feature: Feature, executor: Executor) -> None:
         super().__init__()
         self._feature = feature
-        self._argv = argv
         self._executor = executor
 
     def compose(self) -> ComposeResult:
-        yield Log(highlight=False, id="output")
+        yield Log(highlight=False, id="history")
+        yield Input(placeholder="Tulis pesan...", id="prompt")
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one(Log).write_line(f"$ screening {' '.join(self._argv)}")
-        self._stream()
+        self.query_one(Log).write_line(f"{self._feature.title} — {self._feature.description}")
+        self.query_one(Input).focus()
 
-    @work(exclusive=True)
-    async def _stream(self) -> None:
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        query = event.value.strip()
+        if not query:
+            return
+        event.input.value = ""
+        self.query_one(Log).write_line(f"> {query}")
+        self._send(query)
+
+    @work(group="chat", exclusive=True)
+    async def _send(self, query: str) -> None:
         log = self.query_one(Log)
+        argv = self._feature.command + [query]
         try:
-            proc = self._executor.run(self._argv)
+            proc = self._executor.run(argv)
         except Exception as exc:
             log.write_line(f"✗ Gagal menjalankan: {exc}")
+            log.write_line("")
             return
         try:
             exit_code = await stream_process(proc, log.write_line)
@@ -56,6 +55,7 @@ class CommandViewerScreen(Screen):
             log.write_line(f"✓ Selesai (exit {exit_code})")
         else:
             log.write_line(f"✗ Gagal (exit {exit_code})")
+        log.write_line("")
 
     def action_back(self) -> None:
         self.app.pop_screen()

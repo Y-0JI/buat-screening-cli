@@ -13,9 +13,10 @@ class InputFormScreen(Screen):
         Binding("b", "back", "Kembali"),
     ]
 
-    def __init__(self, feature: Feature) -> None:
+    def __init__(self, feature: Feature, initial: dict[str, str] | None = None) -> None:
         super().__init__()
         self._feature = feature
+        self._initial = initial or {}
 
     def _required_args(self):
         return [a for a in self._feature.args if a.required]
@@ -31,8 +32,18 @@ class InputFormScreen(Screen):
 
     def on_mount(self) -> None:
         args = self._required_args()
-        if args:
-            self.query_one(f"#input-{args[0].name}", Input).focus()
+        if not args:
+            return
+        focus = None
+        for arg in args:
+            inp = self.query_one(f"#input-{arg.name}", Input)
+            if arg.name in self._initial:
+                inp.value = self._initial[arg.name]
+            elif focus is None:
+                focus = inp
+        if focus is None:
+            focus = self.query_one(f"#input-{args[0].name}", Input)
+        focus.focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self.action_submit()

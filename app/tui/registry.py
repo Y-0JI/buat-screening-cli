@@ -27,6 +27,8 @@ class Feature:
     status: FeatureStatus = FeatureStatus.AVAILABLE
     planned_phase: int | None = None
     keywords: list[str] = field(default_factory=list)
+    hidden: bool = False
+    workspace: str | None = None
 
 
 GROUPS = ["Analysis", "Market", "Research", "Watchlist", "System"]
@@ -59,14 +61,30 @@ FEATURES: list[Feature] = [
     Feature("research", "Riset", "Riset mendalam topik atau saham", "Research",
             ["research", "<QUERY>"], _QUERY, keywords=["riset", "laporan"]),
     Feature("natural", "Query Natural", "Eksekusi query bahasa natural", "Research",
-            ["natural"], interactive=True, status=FeatureStatus.PLANNED, planned_phase=2,
+            ["natural"], workspace="chat",
             keywords=["natural", "kalimat"]),
     Feature("chat", "Diskusi AI", "Sesi diskusi interaktif dengan AI", "Research",
             ["chat"], interactive=True, status=FeatureStatus.PLANNED, planned_phase=2,
             keywords=["chat", "tanya"]),
-    Feature("watchlist-show", "Watchlist", "Lihat isi watchlist", "Watchlist",
+    Feature("watchlist-show", "Watchlist", "Kelola watchlist", "Watchlist",
             ["watchlist", "show", "<NAMA_WATCHLIST>"], [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
-            keywords=["watchlist", "list"]),
+            workspace="watchlist", keywords=["watchlist", "list"]),
+    Feature("watchlist-add", "Tambah Simbol", "Tambah simbol ke watchlist", "Watchlist",
+            ["watchlist", "add", "<NAMA_WATCHLIST>", "<TICKER>"],
+            [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True), FeatureArg("ticker", "<TICKER>", True)],
+            hidden=True),
+    Feature("watchlist-remove", "Hapus Simbol", "Hapus simbol dari watchlist", "Watchlist",
+            ["watchlist", "remove", "<NAMA_WATCHLIST>", "<TICKER>"],
+            [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True), FeatureArg("ticker", "<TICKER>", True)],
+            hidden=True),
+    Feature("watchlist-create", "Buat Watchlist", "Buat watchlist baru", "Watchlist",
+            ["watchlist", "create", "<NAMA_WATCHLIST>"],
+            [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
+            hidden=True),
+    Feature("watchlist-delete", "Hapus Watchlist", "Hapus watchlist", "Watchlist",
+            ["watchlist", "delete", "<NAMA_WATCHLIST>"],
+            [FeatureArg("wl_id", "<NAMA_WATCHLIST>", True)],
+            hidden=True),
     Feature("info", "Info Sistem", "Info sistem dan provider data", "System",
             ["info"], keywords=["info", "sistem"]),
     Feature("validate-universe", "Validasi Universe", "Validasi daftar emiten", "System",

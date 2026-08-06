@@ -21,7 +21,7 @@ class DashboardScreen(Screen):
         with VerticalScroll():
             for group in GROUPS:
                 yield Label(f"[bold]{group}[/]")
-                features = [f for f in FEATURES if f.group == group]
+                features = [f for f in FEATURES if f.group == group and not f.hidden]
                 yield ListView(*[FeatureItem(f) for f in features], id=f"list-{group.lower()}")
         yield Footer()
 

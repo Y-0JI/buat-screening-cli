@@ -48,10 +48,13 @@ def test_registry_complete():
 def test_registry_covers_all_commands():
     expected = {"analyze", "trend", "score", "compare", "screen", "gainers", "losers",
                 "sector", "stocks", "research", "natural", "chat", "watchlist-show",
+                "watchlist-add", "watchlist-remove", "watchlist-create", "watchlist-delete",
                 "info", "validate-universe"}
     assert {f.key for f in FEATURES} == expected
     interactive = {f.key for f in FEATURES if f.interactive}
-    assert interactive == {"natural", "chat"}
+    assert interactive == {"chat"}
+    chat_features = {f.key for f in FEATURES if f.workspace == "chat"}
+    assert chat_features == {"natural"}
 
 @pytest.mark.asyncio
 async def test_dashboard_shows_all_groups():
