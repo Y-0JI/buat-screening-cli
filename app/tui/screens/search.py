@@ -22,6 +22,7 @@ class SearchScreen(Screen):
     Substring match TIDAK dipakai di landing — hanya dashboard."""
     BINDINGS = [
         Binding("f2", "open_dashboard", "Menu (f2)"),
+        Binding("ctrl+q", "quit_app", "Keluar"),
     ]
 
     def compose(self) -> ComposeResult:

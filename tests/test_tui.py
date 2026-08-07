@@ -25,7 +25,7 @@ class _EchoExecutor:
 async def test_app_boots_and_quits():
     app = ScreeningApp()
     async with app.run_test() as pilot:
-        await pilot.press("q")
+        await pilot.press("ctrl+q")
     assert app.return_code == 0
 
 def test_main_runs(monkeypatch):
@@ -63,6 +63,8 @@ async def test_dashboard_shows_all_groups():
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
+        await pilot.press("f2")
+        await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         for group in GROUPS:
             assert app.screen.query_one(f"#list-{group.lower()}")
@@ -73,6 +75,8 @@ async def test_dashboard_shows_all_groups():
 async def test_dashboard_open_feature_with_required_args_shows_form():
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()
@@ -102,7 +106,8 @@ async def test_viewer_streams_output_and_back():
         assert "exit 0" in "\n".join(log.lines)
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         await pilot.press("q")
 
 
@@ -110,6 +115,8 @@ async def test_viewer_streams_output_and_back():
 async def test_planned_feature_shows_phase():
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         research_list = app.screen.query_one("#list-research")
         research_list.focus()
@@ -128,6 +135,8 @@ async def test_planned_feature_shows_phase():
 async def test_full_navigation_flow():
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         await pilot.press("enter")

@@ -37,6 +37,9 @@ class _RecordingExecutor:
 
 
 async def _select_feature(pilot, group, index):
+    if not isinstance(pilot.app.screen, DashboardScreen):
+        await pilot.press("f2")
+        await pilot.pause()
     lv = pilot.app.screen.query_one(f"#list-{group}")
     lv.focus()
     lv.index = index
@@ -51,7 +54,8 @@ async def test_all_required_arg_features_build_final_command():
     app._executor = recording
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         for key, group, index, values, expected in CASES:
             await _select_feature(pilot, group, index)
             assert isinstance(app.screen, InputFormScreen), f"{key}: form tidak muncul"
@@ -211,7 +215,8 @@ async def test_chat_workspace_generic_and_history(tmp_path, monkeypatch):
         assert "done" in lines
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         await pilot.press("q")
 
 
@@ -242,6 +247,8 @@ def test_watchlist_action_dashboard_hidden_and_commands():
 async def test_hidden_actions_not_in_dashboard():
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         labels = [str(w.render()) for w in app.screen.query("Label")]
@@ -503,7 +510,10 @@ async def test_dashboard_search_filters_and_opens():
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
+        await pilot.press("f2")
+        await pilot.pause()
         search = app.screen.query_one("#search", Input)
         search.focus()
         search.value = "bank"
@@ -530,6 +540,8 @@ async def test_dashboard_shortcuts_and_help():
 
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         await pilot.press("a")
         await pilot.pause()
@@ -583,7 +595,8 @@ async def test_chat_session_history_persists(tmp_path, monkeypatch):
         await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         # buka lagi -> riwayat tampil
         await app.push_screen(ChatScreen(feature, recording))
         await pilot.pause()
