@@ -9,7 +9,7 @@ from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.viewer import CommandViewerScreen
-from textual.widgets import Static
+from textual.widgets import Input, Static
 
 
 class _EchoExecutor:
@@ -219,3 +219,26 @@ def test_exact_feature_match_only_exact():
     assert exact_feature_match("trends") is None           # substring TIDAK hit
     assert exact_feature_match("gain") is None             # substring TIDAK hit
     assert exact_feature_match("") is None
+
+
+@pytest.mark.asyncio
+async def test_boot_lands_on_search_screen():
+    from app.tui.screens.search import SearchScreen
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        assert isinstance(app.screen, SearchScreen)
+        assert app.screen.query_one("#search", Input).has_focus
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_f2_opens_dashboard():
+    from app.tui.screens.search import SearchScreen
+    app = ScreeningApp()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")

@@ -9,6 +9,7 @@ from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.report import ReportViewerScreen
+from app.tui.screens.search import SearchScreen
 from app.tui.screens.table import ResultTableScreen
 from app.tui.screens.viewer import CommandViewerScreen
 from app.tui.screens.watchlist import WatchlistScreen
@@ -23,7 +24,14 @@ class ScreeningApp(App):
         self._executor = SubprocessExecutor()
 
     def on_mount(self) -> None:
+        self.push_screen(SearchScreen())
+
+    def open_dashboard(self) -> None:
         self.push_screen(DashboardScreen())
+
+    def open_natural(self, query: str) -> None:
+        feature = next(f for f in FEATURES if f.key == "natural")
+        self.push_screen(ChatScreen(feature, self._executor, initial=query))
 
     def _result_screen(self, feature: Feature, argv: list[str]):
         if feature.view == "table":
