@@ -16,7 +16,7 @@ CASES = [
     ("trend", "analysis", 1, {"ticker": "BBCA"}, ["trend", "BBCA"]),
     ("score", "analysis", 2, {"ticker": "BBCA"}, ["score", "BBCA"]),
     ("compare", "analysis", 3, {"tickers": "BBCA,BBRI"}, ["compare", "BBCA,BBRI"]),
-    ("composite", "analysis", 4, {"ticker": "BBCA"}, ["composite", "BBCA"]),
+    ("composite", "analysis", 4, {"ticker": "BBCA"}, ["composite", "BBCA", "--json"]),
     ("sector", "market", 3, {"name": "Financials"}, ["sector", "Financials"]),
     ("research", "research", 0, {"query": "analisa BBCA"}, ["research", "analisa BBCA", "--json"]),
 ]
