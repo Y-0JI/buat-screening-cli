@@ -193,3 +193,29 @@ def test_build_command_optional_args():
 def test_build_command_missing_required_raises():
     with pytest.raises(ValueError):
         build_command(_feature("analyze"), {})
+
+
+def test_feature_matches_substring_for_dashboard():
+    from app.tui.registry import FEATURES, feature_matches
+    gainers = next(f for f in FEATURES if f.key == "gainers")
+    assert feature_matches(gainers, "gainers")
+    assert feature_matches(gainers, "Gainers")
+    assert feature_matches(gainers, "gain")  # substring tetap match (dashboard)
+    assert feature_matches(gainers, "")
+    c = next(f for f in FEATURES if f.key == "composite")
+    assert feature_matches(c, "komposit")
+
+
+def test_exact_feature_match_only_exact():
+    from app.tui.registry import FEATURES, exact_feature_match
+    trend = next(f for f in FEATURES if f.key == "trend")
+    gainers = next(f for f in FEATURES if f.key == "gainers")
+    assert exact_feature_match("trend") is trend
+    assert exact_feature_match("TREND") is trend
+    assert exact_feature_match("tren") is trend            # keyword exact
+    assert exact_feature_match("naik") is gainers          # keyword exact
+    assert exact_feature_match("NAIK") is gainers          # case-insensitive
+    assert exact_feature_match("bbca") is None             # ticker: bukan fitur
+    assert exact_feature_match("trends") is None           # substring TIDAK hit
+    assert exact_feature_match("gain") is None             # substring TIDAK hit
+    assert exact_feature_match("") is None
