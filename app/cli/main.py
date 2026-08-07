@@ -155,6 +155,89 @@ def score(ticker: str) -> None:
 
 
 @app.command()
+def composite(
+    ticker: str = typer.Argument(help="Kode saham"),
+    json: bool = typer.Option(False, "--json", help="Output JSON terstruktur"),
+) -> None:
+    """Tampilan teragregasi satu ticker (quote, stats, signal, narasi AI)."""
+    from app.router.composite import build_composite
+
+    t = normalize(ticker)
+    err = validate_symbol(t)
+    if err:
+        _p.error(err)
+        raise typer.Exit(1)
+    with console.status(f"[bold blue]Merangkai tampilan {t}..."):
+        r = build_composite(t)
+    if json:
+        print(jo.dump(r))
+        return
+    _render_composite(r)
+
+
+def _render_composite(r) -> None:
+    from rich.panel import Panel
+    from rich.text import Text
+
+    quote = r.blocks.get("quote")
+    if quote is not None and quote.status == "available":
+        d = quote.data
+        text = Text()
+        text.append(f"{d.get('name', r.name)}", style="bold white")
+        if d.get("sector"):
+            text.append(f"\nSektor: {d['sector']}", style="dim")
+        text.append(f"\nHarga: {d.get('price', 0):,.0f}", style="cyan")
+        text.append(f" | Perubahan: {d.get('change', '0%')}", style="white")
+        console.print(Panel(text, title=f"[bold]{r.ticker}[/bold] — Quote"))
+    else:
+        console.print("[yellow]⚠ Quote: data tidak tersedia[/yellow]")
+
+    stats = r.blocks.get("stats")
+    if stats is not None and stats.status in ("available", "partial"):
+        d = stats.data
+        lines = []
+        if d.get("indicators"):
+            lines.append(f"Indikator: {d['indicators']}")
+        for key, label in (("per", "PER"), ("pbv", "PBV"), ("der", "DER"), ("roe", "ROE"), ("npm", "NPM"), ("roa", "ROA")):
+            v = d.get(key)
+            if isinstance(v, dict):
+                v = v.get("latest")
+            if v is None:
+                continue
+            try:
+                lines.append(f"{label}: {v:.4f}".rstrip("0").rstrip("."))
+            except (TypeError, ValueError):
+                lines.append(f"{label}: {v}")
+        if lines:
+            console.print(Panel("\n".join(lines), title="[bold]Statistik[/bold]"))
+        if stats.status == "partial":
+            console.print(f"[yellow]⚠ Sebagian statistik tidak tersedia: {stats.error}[/yellow]")
+    else:
+        console.print("[yellow]⚠ Statistik: data tidak tersedia[/yellow]")
+
+    signal = r.blocks.get("signal")
+    if signal is not None and signal.status == "available":
+        signs = signal.data.get("signals") or []
+        if signs:
+            rows = [[f"[{'green' if s['signal'] == 'BUY' else 'red' if s['signal'] == 'SELL' else 'yellow'}]{s['signal']}[/{'green' if s['signal'] == 'BUY' else 'red' if s['signal'] == 'SELL' else 'yellow'}]", s["reason"], f"{s['confidence']:.0%}"] for s in signs]
+            _p.table("Sinyal Screening", [("Sinyal", "bold"), ("Alasan", ""), ("Confidence", "")], rows)
+        else:
+            console.print("[dim]Tidak ada sinyal screening[/dim]")
+    else:
+        console.print("[yellow]⚠ Sinyal: data tidak tersedia[/yellow]")
+
+    narrative = r.blocks.get("narrative")
+    if narrative is not None and narrative.status == "available":
+        summary = narrative.data.get("summary", "")
+        if summary:
+            console.print(Panel(summary, title="[bold cyan]Narasi AI[/bold cyan]", border_style="blue"))
+        else:
+            console.print("[yellow]⚠ Narasi AI: analisis tidak tersedia[/yellow]")
+    else:
+        console.print("[yellow]⚠ Narasi AI: data tidak tersedia[/yellow]")
+
+
+@app.command()
 def compare(
     ticker1: str = typer.Argument(help="Ticker pertama (atau dua ticker pisah koma)"),
     ticker2: str = typer.Argument("", help="Ticker kedua (opsional)"),

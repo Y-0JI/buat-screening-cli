@@ -4,6 +4,7 @@ from textual.binding import Binding
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import FEATURES, Feature, FeatureStatus, build_command
 from app.tui.screens.chat import ChatScreen
+from app.tui.screens.composite import CompositeViewScreen
 from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
@@ -29,6 +30,8 @@ class ScreeningApp(App):
             return ResultTableScreen(feature, argv, self._executor)
         if feature.view == "report":
             return ReportViewerScreen(feature, argv, self._executor)
+        if feature.view == "composite":
+            return CompositeViewScreen(feature, argv, self._executor)
         return CommandViewerScreen(feature, argv, self._executor)
 
     def open_feature(self, feature: Feature, initial: dict[str, str] | None = None) -> None:
