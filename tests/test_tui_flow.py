@@ -757,3 +757,22 @@ async def test_composite_cancel_mid_process_terminates():
     if p1.poll() is None:
         p1.kill()
         p1.wait()
+
+
+@pytest.mark.asyncio
+async def test_chat_auto_sends_initial(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording, initial="analisa BBCA"))
+        await pilot.pause()
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert recording.calls == [["natural", "analisa BBCA"]]
+        assert "> analisa BBCA" in lines
+        await pilot.press("q")
