@@ -47,6 +47,8 @@ FEATURES: list[Feature] = [
             ["score", "<TICKER>"], _TICKER, keywords=["skor", "valuasi"]),
     Feature("compare", "Bandingkan", "Bandingkan dua saham", "Analysis",
             ["compare", "<TICKER1,TICKER2>"], _COMPARE, keywords=["banding", "compare"]),
+    Feature("composite", "Tampilan Terpadu", "Quote, stats, sinyal, dan narasi AI dalam satu layar", "Analysis",
+            ["composite", "<TICKER>"], _TICKER, keywords=["terpadu", "komposit", "composite"], view="composite"),
     Feature("screen", "Screening", "Screening saham dengan filter", "Market",
             ["screen"], [FeatureArg("sector", "<SEKTOR>", False, option=True)],
             keywords=["screener", "filter"], view="table"),
