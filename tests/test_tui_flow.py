@@ -776,3 +776,41 @@ async def test_chat_auto_sends_initial(tmp_path, monkeypatch):
         assert recording.calls == [["natural", "analisa BBCA"]]
         assert "> analisa BBCA" in lines
         await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_unmatched_goes_to_natural_chat(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    from app.tui.screens.chat import ChatScreen
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "analisa BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ChatScreen)
+        assert recording.calls == [["natural", "analisa BBCA"]]
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_feature_keyword_exact_gainers():
+    from app.tui.screens.table import ResultTableScreen
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "gainers"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        assert recording.calls == [["gainers", "--json"]]
+        await pilot.press("q")

@@ -242,3 +242,72 @@ async def test_f2_opens_dashboard():
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_exact_feature_name_beats_ticker_shape():
+    # 'trend' / 'TREND' / 'tren': persis nama fitur sekaligus bentuk kode
+    # (2-5 huruf kapital). Aturan: exact fitur MENANG — form tren, bukan composite.
+    for query in ("trend", "TREND", "tren"):
+        app = ScreeningApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            inp = app.screen.query_one("#search", Input)
+            inp.value = query
+            await pilot.press("enter")
+            await pilot.pause()
+            assert isinstance(app.screen, InputFormScreen), f"{query}: harus form tren"
+            await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_keyword_exact_beats_ticker_shape():
+    # 'NAIK': 4 huruf kapital (bentuk ticker) TAPI keyword exact dari gainers.
+    from app.tui.screens.table import ResultTableScreen
+    app = ScreeningApp()
+    app._executor = _EchoExecutor()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "NAIK"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_real_ticker_not_feature_goes_composite():
+    # 'BBRI': ticker beneran, tidak menyrempet nama fitur mana pun → composite.
+    from app.tui.screens.composite import CompositeViewScreen
+    app = ScreeningApp()
+    app._executor = _EchoExecutor()
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "BBRI"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, CompositeViewScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_partial_name_no_longer_matches_feature():
+    # Sebagian nama fitur (bukan exact) TIDAK lagi naik fitur: substring mati
+    # di landing. Fragment 2-5 huruf kapital jatuh ke branch ticker → composite.
+    from app.tui.screens.composite import CompositeViewScreen
+    for query in ("tre", "gain"):
+        app = ScreeningApp()
+        app._executor = _EchoExecutor()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            inp = app.screen.query_one("#search", Input)
+            inp.value = query
+            await pilot.press("enter")
+            await pilot.pause()
+            await pilot.pause()
+            assert isinstance(app.screen, CompositeViewScreen), f"{query}: rute salah"
+            await pilot.press("q")
