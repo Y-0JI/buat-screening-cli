@@ -4,10 +4,12 @@ from textual.binding import Binding
 from app.tui.executor import SubprocessExecutor
 from app.tui.registry import FEATURES, Feature, FeatureStatus, build_command
 from app.tui.screens.chat import ChatScreen
+from app.tui.screens.composite import CompositeViewScreen
 from app.tui.screens.dashboard import DashboardScreen
 from app.tui.screens.input import InputFormScreen
 from app.tui.screens.planned import PlannedScreen
 from app.tui.screens.report import ReportViewerScreen
+from app.tui.screens.search import SearchScreen
 from app.tui.screens.table import ResultTableScreen
 from app.tui.screens.viewer import CommandViewerScreen
 from app.tui.screens.watchlist import WatchlistScreen
@@ -22,13 +24,22 @@ class ScreeningApp(App):
         self._executor = SubprocessExecutor()
 
     def on_mount(self) -> None:
+        self.push_screen(SearchScreen())
+
+    def open_dashboard(self) -> None:
         self.push_screen(DashboardScreen())
+
+    def open_natural(self, query: str) -> None:
+        feature = next(f for f in FEATURES if f.key == "natural")
+        self.push_screen(ChatScreen(feature, self._executor, initial=query))
 
     def _result_screen(self, feature: Feature, argv: list[str]):
         if feature.view == "table":
             return ResultTableScreen(feature, argv, self._executor)
         if feature.view == "report":
             return ReportViewerScreen(feature, argv, self._executor)
+        if feature.view == "composite":
+            return CompositeViewScreen(feature, argv, self._executor)
         return CommandViewerScreen(feature, argv, self._executor)
 
     def open_feature(self, feature: Feature, initial: dict[str, str] | None = None) -> None:

@@ -4,7 +4,7 @@ from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView
 
-from app.tui.registry import FEATURES, GROUPS, Feature, FeatureStatus
+from app.tui.registry import FEATURES, GROUPS, Feature, FeatureStatus, feature_matches
 from app.tui.shortcuts import SHORTCUTS
 
 
@@ -88,10 +88,7 @@ class DashboardScreen(Screen):
             event.stop()
 
     def _matches(self, feature: Feature) -> bool:
-        if not self._query:
-            return True
-        hay = [feature.title.lower(), feature.key.lower()] + [k.lower() for k in feature.keywords]
-        return any(self._query in h for h in hay)
+        return feature_matches(feature, self._query)
 
     def _apply_filter(self) -> None:
         for group in GROUPS:

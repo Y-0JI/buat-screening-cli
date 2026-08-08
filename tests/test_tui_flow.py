@@ -16,6 +16,7 @@ CASES = [
     ("trend", "analysis", 1, {"ticker": "BBCA"}, ["trend", "BBCA"]),
     ("score", "analysis", 2, {"ticker": "BBCA"}, ["score", "BBCA"]),
     ("compare", "analysis", 3, {"tickers": "BBCA,BBRI"}, ["compare", "BBCA,BBRI"]),
+    ("composite", "analysis", 4, {"ticker": "BBCA"}, ["composite", "BBCA", "--json"]),
     ("sector", "market", 3, {"name": "Financials"}, ["sector", "Financials"]),
     ("research", "research", 0, {"query": "analisa BBCA"}, ["research", "analisa BBCA", "--json"]),
 ]
@@ -36,6 +37,9 @@ class _RecordingExecutor:
 
 
 async def _select_feature(pilot, group, index):
+    if not isinstance(pilot.app.screen, DashboardScreen):
+        await pilot.press("f2")
+        await pilot.pause()
     lv = pilot.app.screen.query_one(f"#list-{group}")
     lv.focus()
     lv.index = index
@@ -50,7 +54,8 @@ async def test_all_required_arg_features_build_final_command():
     app._executor = recording
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         for key, group, index, values, expected in CASES:
             await _select_feature(pilot, group, index)
             assert isinstance(app.screen, InputFormScreen), f"{key}: form tidak muncul"
@@ -61,7 +66,11 @@ async def test_all_required_arg_features_build_final_command():
             await pilot.pause()
             screen = app.screen
             from app.tui.screens.report import ReportViewerScreen
-            expected_type = ReportViewerScreen if key == "research" else CommandViewerScreen
+            from app.tui.screens.composite import CompositeViewScreen
+            expected_type = {
+                "research": ReportViewerScreen,
+                "composite": CompositeViewScreen,
+            }.get(key, CommandViewerScreen)
             assert isinstance(screen, expected_type), f"{key}: screen salah {type(screen).__name__}"
             assert recording.calls[-1] == expected, f"{key}: argv salah {recording.calls[-1]}"
             assert "<" not in json.dumps(recording.calls[-1]), f"{key}: masih ada placeholder"
@@ -206,7 +215,8 @@ async def test_chat_workspace_generic_and_history(tmp_path, monkeypatch):
         assert "done" in lines
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         await pilot.press("q")
 
 
@@ -237,6 +247,8 @@ def test_watchlist_action_dashboard_hidden_and_commands():
 async def test_hidden_actions_not_in_dashboard():
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         assert isinstance(app.screen, DashboardScreen)
         labels = [str(w.render()) for w in app.screen.query("Label")]
@@ -498,7 +510,10 @@ async def test_dashboard_search_filters_and_opens():
     app = ScreeningApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
+        await pilot.press("f2")
+        await pilot.pause()
         search = app.screen.query_one("#search", Input)
         search.focus()
         search.value = "bank"
@@ -525,6 +540,8 @@ async def test_dashboard_shortcuts_and_help():
 
     app = ScreeningApp()
     async with app.run_test() as pilot:
+        await pilot.pause()
+        await pilot.press("f2")
         await pilot.pause()
         await pilot.press("a")
         await pilot.pause()
@@ -578,7 +595,8 @@ async def test_chat_session_history_persists(tmp_path, monkeypatch):
         await pilot.pause()
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DashboardScreen)
+        from app.tui.screens.search import SearchScreen
+        assert isinstance(app.screen, SearchScreen)
         # buka lagi -> riwayat tampil
         await app.push_screen(ChatScreen(feature, recording))
         await pilot.pause()
@@ -645,4 +663,167 @@ async def test_chat_header_once_with_existing_history(tmp_path, monkeypatch):
         lines = "\n".join(app.screen.query_one("#history").lines)
         assert lines.count(header) == 1, f"header dobel: {lines}"
         assert "> analisa BBCA" in lines and "hasil lama" in lines
+        await pilot.press("q")
+
+
+def _composite_payload(narrative_status="available") -> dict:
+    payload = {
+        "ticker": "BBCA",
+        "name": "Bank BCA",
+        "blocks": {
+            "quote": {"status": "available", "data": {"price": 9500.0, "change": "+1.23%", "name": "Bank BCA", "sector": "Financials"}},
+            "stats": {"status": "available", "data": {"indicators": "RSI=60.0 | SMA20=9500", "per": 22.5, "roe": 0.18}},
+            "signal": {"status": "available", "data": {"signals": [{"signal": "BUY", "reason": "Golden Cross", "confidence": 0.8}]}},
+            "narrative": {"status": narrative_status, "data": {"summary": "Bank BCA fundamental kuat."} if narrative_status == "available" else {}, "error": None},
+        },
+    }
+    return payload
+
+
+@pytest.mark.asyncio
+async def test_composite_renders_all_blocks():
+    from app.tui.screens.composite import CompositeViewScreen
+
+    app = ScreeningApp()
+    app._executor = _JsonExecutor(_composite_payload())
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await _select_feature(pilot, "analysis", 4)
+        assert isinstance(app.screen, InputFormScreen)
+        app.screen.query_one("#input-ticker", Input).value = "BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, CompositeViewScreen)
+        header = str(app.screen.query_one("#header").render())
+        quote = str(app.screen.query_one("#quote").render())
+        stats = str(app.screen.query_one("#stats").render())
+        narrative = str(app.screen.query_one("#narrative").render())
+        signal = str(app.screen.query_one("#signal").render())
+        assert "Bank BCA" in header
+        assert "9,500" in quote and "Financials" in quote
+        assert "PER: 22.5" in stats and "RSI" in stats
+        assert "BUY" in signal
+        assert "Bank BCA fundamental kuat" in narrative
+        assert "PER: 22.5" in stats and "RSI" in stats
+        assert "BUY" in signal
+        assert "Bank BCA fundamental kuat" in narrative
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, DashboardScreen)
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_composite_narrative_unavailable_others_render():
+    from app.tui.screens.composite import CompositeViewScreen
+
+    payload = _composite_payload(narrative_status="unavailable")
+    payload["blocks"]["narrative"]["error"] = "LLM down"
+    app = ScreeningApp()
+    app._executor = _JsonExecutor(payload)
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(CompositeViewScreen(next(f for f in FEATURES if f.key == "composite"), ["composite", "BBCA"], app._executor))
+        await pilot.pause()
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, CompositeViewScreen)
+        quote = str(app.screen.query_one("#quote").render())
+        narrative = str(app.screen.query_one("#narrative").render())
+        assert "9,500" in quote, "blok lain harus tetap render"
+        assert "Narasi AI: data tidak tersedia" in narrative
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_composite_cancel_mid_process_terminates():
+    from app.tui.screens.composite import CompositeViewScreen
+    import time
+
+    class _SleepAllExecutor:
+        def __init__(self):
+            self.procs = []
+
+        def run(self, argv):
+            p = subprocess.Popen(["sleep", "30"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            self.procs.append(p)
+            return p
+
+    feature = next(f for f in FEATURES if f.key == "composite")
+    app = ScreeningApp()
+    slow = _SleepAllExecutor()
+    app._executor = slow
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(CompositeViewScreen(feature, ["composite", "BBCA"], slow))
+        await pilot.pause()
+        start = time.monotonic()
+        await pilot.press("escape")
+        await pilot.pause()
+        elapsed = time.monotonic() - start
+        p1 = slow.procs[0]
+        assert p1.poll() is not None, "CompositeViewScreen: proses tidak di-terminate"
+        assert elapsed < 5.0, f"CompositeViewScreen: cancel lambat {elapsed:.1f}s"
+        await pilot.press("q")
+    if p1.poll() is None:
+        p1.kill()
+        p1.wait()
+
+
+@pytest.mark.asyncio
+async def test_chat_auto_sends_initial(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    feature = next(f for f in FEATURES if f.key == "natural")
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        await app.push_screen(ChatScreen(feature, recording, initial="analisa BBCA"))
+        await pilot.pause()
+        await pilot.pause()
+        lines = "\n".join(app.screen.query_one("#history").lines)
+        assert recording.calls == [["natural", "analisa BBCA"]]
+        assert "> analisa BBCA" in lines
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_unmatched_goes_to_natural_chat(tmp_path, monkeypatch):
+    import app.tui.session as session_mod
+    monkeypatch.setattr(session_mod, "_PATH", tmp_path / "tui_session.json")
+    from app.tui.screens.chat import ChatScreen
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "analisa BBCA"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ChatScreen)
+        assert recording.calls == [["natural", "analisa BBCA"]]
+        await pilot.press("q")
+
+
+@pytest.mark.asyncio
+async def test_search_feature_keyword_exact_gainers():
+    from app.tui.screens.table import ResultTableScreen
+    app = ScreeningApp()
+    recording = _RecordingExecutor()
+    app._executor = recording
+    async with app.run_test() as pilot:
+        await pilot.pause()
+        inp = app.screen.query_one("#search", Input)
+        inp.value = "gainers"
+        await pilot.press("enter")
+        await pilot.pause()
+        await pilot.pause()
+        assert isinstance(app.screen, ResultTableScreen)
+        assert recording.calls == [["gainers", "--json"]]
         await pilot.press("q")

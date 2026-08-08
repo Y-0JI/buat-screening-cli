@@ -14,3 +14,4 @@ app/data/ai_memory.json
 *.bak
 .worktrees/
 app/data/tui_session.json
+.superpowers/

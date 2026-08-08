@@ -47,6 +47,8 @@ FEATURES: list[Feature] = [
             ["score", "<TICKER>"], _TICKER, keywords=["skor", "valuasi"]),
     Feature("compare", "Bandingkan", "Bandingkan dua saham", "Analysis",
             ["compare", "<TICKER1,TICKER2>"], _COMPARE, keywords=["banding", "compare"]),
+    Feature("composite", "Tampilan Terpadu", "Quote, stats, sinyal, dan narasi AI dalam satu layar", "Analysis",
+            ["composite", "<TICKER>"], _TICKER, keywords=["terpadu", "komposit", "composite"], view="composite"),
     Feature("screen", "Screening", "Screening saham dengan filter", "Market",
             ["screen"], [FeatureArg("sector", "<SEKTOR>", False, option=True)],
             keywords=["screener", "filter"], view="table"),
@@ -124,3 +126,30 @@ def build_command(feature: Feature, values: dict[str, str]) -> list[str]:
         else:
             argv.append(val)
     return argv
+
+
+def feature_matches(feature: Feature, query: str) -> bool:
+    """True kalau query substring-match title/key/keywords fitur (case-insensitive)."""
+    q = query.strip().lower()
+    if not q:
+        return True
+    hay = [feature.title.lower(), feature.key.lower()] + [k.lower() for k in feature.keywords]
+    return any(q in h for h in hay)
+
+
+def exact_feature_match(query: str) -> Feature | None:
+    """Fitur yang nama/key/keyword-nya PERSIS query (case-insensitive), atau None.
+
+    Aturan disambiguasi landing search: kecocokan PERSIS menang atas bentuk
+    kode saham. 'trend'/'naik' = nama fitur, bukan ticker. Substring sengaja
+    TIDAK match — itu wilayah dashboard. Fitur pertama (urutan FEATURES)
+    dikembalikan bila ada keyword dobel."""
+    q = query.strip().lower()
+    if not q:
+        return None
+    for f in FEATURES:
+        if f.hidden:
+            continue
+        if q == f.key.lower() or q == f.title.lower() or q in [k.lower() for k in f.keywords]:
+            return f
+    return None

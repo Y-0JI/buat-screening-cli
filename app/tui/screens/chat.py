@@ -15,10 +15,11 @@ class ChatScreen(Screen):
         Binding("b", "back", "Kembali"),
     ]
 
-    def __init__(self, feature: Feature, executor: Executor) -> None:
+    def __init__(self, feature: Feature, executor: Executor, initial: str | None = None) -> None:
         super().__init__()
         self._feature = feature
         self._executor = executor
+        self._initial = initial
         self._lines: list[str] = []
 
     def compose(self) -> ComposeResult:
@@ -36,6 +37,12 @@ class ChatScreen(Screen):
         for line in self._lines:
             self.query_one(Log).write_line(line)
         self._write(f"{self._feature.title} — {self._feature.description}")
+        if self._initial:
+            query = self._initial.strip()
+            if query:
+                self._write(f"> {query}")
+                self._send(query)
+                return
         self.query_one(Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
