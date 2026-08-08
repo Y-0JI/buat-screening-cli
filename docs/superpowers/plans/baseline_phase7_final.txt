@@ -1,0 +1,4 @@
+Phase 7 Search-First Landing — baseline final
+Run: pytest -q (npm none; plain python)
+Result: 382 passed, 2 failed (network pre-existing, sama dgn baseline Phase 6)
+Smoke: landing OK (SearchScreen boot, f2 -> Dashboard, quit landing via ctrl+q)
